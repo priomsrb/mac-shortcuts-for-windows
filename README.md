@@ -35,7 +35,7 @@ dotnet publish src/MacShortcuts -c Release -r win-x64 --self-contained -p:Publis
 
 ## How it works
 
-A low-level keyboard hook (`WH_KEYBOARD_LL`) runs on a dedicated thread. Alt key-downs pass through untouched so unmapped combos keep working. When a mapped key is pressed, the key is swallowed, Alt is released logically (after tapping an unassigned "mask" key so the menu bar doesn't activate), and the replacement keys are injected with `SendInput`. See [KeyRemapper.cs](src/MacShortcuts/KeyRemapper.cs).
+A low-level keyboard hook (`WH_KEYBOARD_LL`) runs on a dedicated thread. Alt key-downs pass through untouched so unmapped combos keep working. When a mapped key is pressed, the key is swallowed, Alt is released logically (after tapping an unassigned "mask" key so the menu bar doesn't activate), and the replacement keys are injected with `SendInput`. See [KeyRemapper.cs](src/MacShortcuts/Remapping/KeyRemapper.cs).
 
 ## Development
 

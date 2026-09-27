@@ -1,10 +1,8 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using MacShortcuts.Remapping;
+using MacShortcuts.Shortcuts;
 
-namespace MacShortcuts;
-
-[JsonConverter(typeof(JsonStringEnumConverter<AppTheme>))]
-public enum AppTheme { System, Light, Dark }
+namespace MacShortcuts.Settings;
 
 public sealed class AppSettings
 {

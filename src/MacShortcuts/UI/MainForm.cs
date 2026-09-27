@@ -1,4 +1,9 @@
-namespace MacShortcuts;
+using MacShortcuts.Platform;
+using MacShortcuts.Settings;
+using MacShortcuts.Shortcuts;
+using MacShortcuts.UI.Controls;
+
+namespace MacShortcuts.UI;
 
 internal sealed class MainForm : Form
 {
@@ -91,7 +96,7 @@ internal sealed class MainForm : Form
                 groups[shortcut.Category] = group;
                 _list.Groups.Add(group);
             }
-            _list.Items.Add(new ListViewItem([shortcut.Trigger, shortcut.Sends, shortcut.Description], group) { Tag = shortcut });
+            _list.Items.Add(new ListViewItem([shortcut.TriggerText, shortcut.SendsText, shortcut.Description], group) { Tag = shortcut });
         }
         if (Application.IsDarkModeEnabled) _list.UseDarkCheckBoxes();
         _list.ItemChecked += OnItemChecked;

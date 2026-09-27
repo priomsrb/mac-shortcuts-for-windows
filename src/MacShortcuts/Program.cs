@@ -1,10 +1,9 @@
+using MacShortcuts.UI;
+
 namespace MacShortcuts;
 
 internal static class Program
 {
-    public const string MinimizedArg = "--minimized";
-    public const string WaitForPreviousArg = "--wait-for-previous";
-
     const string MutexName = @"Local\MacShortcutsForWindows.Instance";
     const string ShowEventName = @"Local\MacShortcutsForWindows.Show";
 
@@ -25,7 +24,7 @@ internal static class Program
 
         using (mutex)
         {
-            if (!owned && args.Contains(WaitForPreviousArg))
+            if (!owned && args.Contains(CommandLineArgs.WaitForPrevious))
             {
                 // Restarting (e.g. as admin): give the previous instance time to exit.
                 try { owned = mutex.WaitOne(TimeSpan.FromSeconds(10)); }
@@ -44,7 +43,7 @@ internal static class Program
 
             ApplicationConfiguration.Initialize();
             var sync = new WindowsFormsSynchronizationContext();
-            var app = new TrayApp(startMinimized: args.Contains(MinimizedArg));
+            var app = new TrayApp(startMinimized: args.Contains(CommandLineArgs.Minimized));
 
             var wait = ThreadPool.RegisterWaitForSingleObject(showEvent,
                 (_, _) => sync.Post(_ => app.ShowSettings(), null), null, Timeout.Infinite, executeOnlyOnce: false);

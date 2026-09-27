@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace MacShortcuts;
+namespace MacShortcuts.Interop;
 
 /// <summary>Win32 interop used by the keyboard/mouse hooks.</summary>
 internal static class Native

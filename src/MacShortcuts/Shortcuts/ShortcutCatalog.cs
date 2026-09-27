@@ -1,28 +1,4 @@
-namespace MacShortcuts;
-
-[Flags]
-public enum Mods { None = 0, Ctrl = 1, Shift = 2, Alt = 4, Win = 8 }
-
-/// <summary>A key pressed together with a set of modifiers.</summary>
-public readonly record struct Chord(Keys Key, Mods Mods = Mods.None);
-
-/// <summary>A key pressed while "Cmd" (Alt) is held, optionally with Shift.</summary>
-public readonly record struct Trigger(Keys Key, bool Shift);
-
-public abstract record ShortcutAction;
-public sealed record SendKeysAction(IReadOnlyList<Chord> Chords) : ShortcutAction;
-public sealed record MinimizeWindowAction : ShortcutAction;
-
-public sealed record Binding(Trigger Trigger, ShortcutAction Action);
-
-public sealed record ShortcutDef(
-    string Id,
-    string Category,
-    string Trigger,
-    string Sends,
-    string Description,
-    bool DefaultEnabled,
-    IReadOnlyList<Binding> Bindings);
+namespace MacShortcuts.Shortcuts;
 
 public static class ShortcutCatalog
 {

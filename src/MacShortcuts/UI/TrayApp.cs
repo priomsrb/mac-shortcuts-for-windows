@@ -1,6 +1,9 @@
+using MacShortcuts.Platform;
+using MacShortcuts.Remapping;
+using MacShortcuts.Settings;
 using Microsoft.Win32;
 
-namespace MacShortcuts;
+namespace MacShortcuts.UI;
 
 /// <summary>Owns the tray icon, the settings window and the remapper for the app's lifetime.</summary>
 internal sealed class TrayApp : ApplicationContext

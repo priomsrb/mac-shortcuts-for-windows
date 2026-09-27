@@ -1,16 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using static MacShortcuts.Native;
+using MacShortcuts.Shortcuts;
+using static MacShortcuts.Interop.Native;
 
-namespace MacShortcuts;
-
-public sealed record RemapConfig(
-    bool Enabled,
-    bool LeftAlt,
-    bool RightAlt,
-    bool CtrlClick,
-    IReadOnlyDictionary<Trigger, ShortcutAction> Map,
-    IReadOnlySet<string> ExcludedApps);
+namespace MacShortcuts.Remapping;
 
 /// <summary>
 /// Installs low-level keyboard and mouse hooks on a dedicated thread and rewrites
