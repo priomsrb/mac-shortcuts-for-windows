@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices;
+using MacShortcuts.Interop;
+using static MacShortcuts.Interop.ComCtl32;
+using static MacShortcuts.Interop.User32;
 
 namespace MacShortcuts.UI.Controls;
 
@@ -8,16 +11,8 @@ namespace MacShortcuts.UI.Controls;
 /// </summary>
 internal sealed class ThemedListView : ListView
 {
-    const int WM_REFLECT_NOTIFY = 0x2000 + 0x004E;
-    const int NM_CUSTOMDRAW = -12;
-    const int CDDS_PREPAINT = 0x1;
-    const int CDRF_SKIPDEFAULT = 0x4;
-    const int LVCDI_GROUP = 0x1;
-    const int LVM_GETGROUPINFO = 0x1000 + 149;
-    const int LVGF_HEADER = 0x1;
-    const int LVM_GETIMAGELIST = 0x1000 + 2;
-    const int LVSIL_STATE = 2;
-    const int WM_THEMECHANGED = 0x031A;
+    // WinForms reflects WM_NOTIFY back to the control that sent it.
+    const int WM_REFLECT_NOTIFY = 0x2000 + WM_NOTIFY;
 
     bool _darkCheckBoxes;
 
@@ -114,71 +109,5 @@ internal sealed class ThemedListView : ListView
             finally { Marshal.FreeHGlobal(ptr); }
         }
         finally { Marshal.FreeHGlobal(buffer); }
-    }
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    static extern IntPtr SendMessage(IntPtr hWnd, int msg, nint wParam, IntPtr lParam);
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct RECT { public int left, top, right, bottom; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct NMHDR
-    {
-        public IntPtr hwndFrom;
-        public nuint idFrom;
-        public int code;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct NMLVCUSTOMDRAW
-    {
-        public NMHDR hdr;
-        public int dwDrawStage;
-        public IntPtr hdc;
-        public RECT rc;
-        public nuint dwItemSpec;
-        public uint uItemState;
-        public IntPtr lItemlParam;
-        public int clrText;
-        public int clrTextBk;
-        public int iSubItem;
-        public int dwItemType;
-        public int clrFace;
-        public int iIconEffect;
-        public int iIconPhase;
-        public int iPartId;
-        public int iStateId;
-        public RECT rcText;
-        public uint uAlign;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct LVGROUP
-    {
-        public uint cbSize;
-        public uint mask;
-        public IntPtr pszHeader;
-        public int cchHeader;
-        public IntPtr pszFooter;
-        public int cchFooter;
-        public int iGroupId;
-        public uint stateMask;
-        public uint state;
-        public uint uAlign;
-        public IntPtr pszSubtitle;
-        public uint cchSubtitle;
-        public IntPtr pszTask;
-        public uint cchTask;
-        public IntPtr pszDescriptionTop;
-        public uint cchDescriptionTop;
-        public IntPtr pszDescriptionBottom;
-        public uint cchDescriptionBottom;
-        public int iTitleImage;
-        public int iExtendedImage;
-        public int iFirstItem;
-        public uint cItems;
-        public IntPtr pszSubsetTitle;
-        public uint cchSubsetTitle;
     }
 }

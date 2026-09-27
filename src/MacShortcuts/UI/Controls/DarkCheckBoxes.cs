@@ -1,15 +1,14 @@
 using System.Runtime.InteropServices;
+using MacShortcuts.Interop;
+using static MacShortcuts.Interop.ComCtl32;
+using static MacShortcuts.Interop.Gdi32;
+using static MacShortcuts.Interop.UxTheme;
 
 namespace MacShortcuts.UI.Controls;
 
 /// <summary>Draws checkbox glyphs from the Windows dark theme into a native image list.</summary>
 internal static class DarkCheckBoxes
 {
-    const int BP_CHECKBOX = 3;
-    const int CBS_UNCHECKEDNORMAL = 1;
-    const int CBS_CHECKEDNORMAL = 5;
-    const int TS_DRAW = 2;
-
     /// <summary>Overwrites images 0 (unchecked) and 1 (checked), the ListView state image layout.</summary>
     /// <returns>false if this version of Windows has no dark theme.</returns>
     public static bool Draw(IntPtr imageList, int dpi)
@@ -58,62 +57,4 @@ internal static class DarkCheckBoxes
         ImageList_Replace(imageList, index, dib, IntPtr.Zero);
         DeleteObject(dib);
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct RECT { public int left, top, right, bottom; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct SIZE { public int cx, cy; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct BITMAPINFOHEADER
-    {
-        public int biSize;
-        public int biWidth;
-        public int biHeight;
-        public short biPlanes;
-        public short biBitCount;
-        public int biCompression;
-        public int biSizeImage;
-        public int biXPelsPerMeter;
-        public int biYPelsPerMeter;
-        public int biClrUsed;
-        public int biClrImportant;
-    }
-
-    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
-    static extern IntPtr OpenThemeDataForDpi(IntPtr hwnd, string classList, int dpi);
-
-    [DllImport("uxtheme.dll")]
-    static extern int CloseThemeData(IntPtr theme);
-
-    [DllImport("uxtheme.dll")]
-    static extern int GetThemePartSize(IntPtr theme, IntPtr hdc, int part, int state, IntPtr rect, int size, out SIZE result);
-
-    [DllImport("uxtheme.dll")]
-    static extern int DrawThemeBackground(IntPtr theme, IntPtr hdc, int part, int state, ref RECT rect, IntPtr clip);
-
-    [DllImport("gdi32.dll")]
-    static extern IntPtr CreateDIBSection(IntPtr hdc, ref BITMAPINFOHEADER header, uint usage, out IntPtr bits, IntPtr section, uint offset);
-
-    [DllImport("gdi32.dll")]
-    static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-
-    [DllImport("gdi32.dll")]
-    static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
-
-    [DllImport("gdi32.dll")]
-    static extern bool DeleteDC(IntPtr hdc);
-
-    [DllImport("gdi32.dll")]
-    static extern bool DeleteObject(IntPtr obj);
-
-    [DllImport("gdi32.dll")]
-    static extern bool GdiFlush();
-
-    [DllImport("comctl32.dll")]
-    static extern bool ImageList_GetIconSize(IntPtr imageList, out int cx, out int cy);
-
-    [DllImport("comctl32.dll")]
-    static extern bool ImageList_Replace(IntPtr imageList, int index, IntPtr image, IntPtr mask);
 }

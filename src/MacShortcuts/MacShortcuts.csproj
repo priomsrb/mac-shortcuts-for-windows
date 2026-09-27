@@ -6,6 +6,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>MacShortcuts</AssemblyName>
     <RootNamespace>MacShortcuts</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>

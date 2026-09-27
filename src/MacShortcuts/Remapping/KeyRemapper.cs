@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using MacShortcuts.Interop;
 using MacShortcuts.Shortcuts;
-using static MacShortcuts.Interop.Native;
+using static MacShortcuts.Interop.Kernel32;
+using static MacShortcuts.Interop.User32;
 
 namespace MacShortcuts.Remapping;
 
@@ -33,6 +35,7 @@ public sealed class KeyRemapper : IDisposable
         new Dictionary<Trigger, ShortcutAction>(), new HashSet<string>());
     volatile bool _resetRequested;
 
+    // Kept in fields so the delegates outlive the native hooks that call them.
     readonly HookProc _keyboardProc;
     readonly HookProc _mouseProc;
     Thread? _thread;
@@ -59,8 +62,8 @@ public sealed class KeyRemapper : IDisposable
         {
             _threadId = GetCurrentThreadId();
             var module = GetModuleHandle(null);
-            var kb = SetWindowsHookEx(WH_KEYBOARD_LL, _keyboardProc, module, 0);
-            var mouse = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc, module, 0);
+            var kb = SetWindowsHookEx(WH_KEYBOARD_LL, Marshal.GetFunctionPointerForDelegate(_keyboardProc), module, 0);
+            var mouse = SetWindowsHookEx(WH_MOUSE_LL, Marshal.GetFunctionPointerForDelegate(_mouseProc), module, 0);
             ready.Set();
 
             while (GetMessage(out _, IntPtr.Zero, 0, 0) > 0) { }
