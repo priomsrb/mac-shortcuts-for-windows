@@ -2,9 +2,12 @@ namespace MacShortcuts.Shortcuts;
 
 public static class ShortcutCatalog
 {
-    public const string MouseCtrlClickId = "mouse.ctrlClick";
+    const string CtrlClickId = "mouse.ctrlClick";
 
     public static IReadOnlyList<ShortcutDef> All { get; } = Build();
+
+    /// <summary>Alt+Click → Ctrl+Click. Handled by the mouse hook, so it has no key bindings.</summary>
+    public static ShortcutDef CtrlClick { get; } = All.Single(s => s.Id == CtrlClickId);
 
     static List<ShortcutDef> Build()
     {
@@ -101,7 +104,7 @@ public static class ShortcutCatalog
             [Map(Keys.Space, false, new Chord(Keys.S, Mods.Win))], on: false);
 
         const string Mouse = "Mouse";
-        Add(MouseCtrlClickId, Mouse, "Alt+Click", "Ctrl+Click", "Open link in new tab, multi-select, go to definition", []);
+        Add(CtrlClickId, Mouse, "Alt+Click", "Ctrl+Click", "Open link in new tab, multi-select, go to definition", []);
 
         // Catch-alls cover every letter not already claimed above, so they never override a specific shortcut.
         var used = list.SelectMany(s => s.Bindings).Select(b => b.Trigger).ToHashSet();

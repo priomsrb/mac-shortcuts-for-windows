@@ -40,7 +40,7 @@ public class AppSettingsTests
         var settings = new AppSettings();
         Assert.True(settings.ToConfig().CtrlClick);
 
-        settings.Shortcuts[ShortcutCatalog.MouseCtrlClickId] = false;
+        settings.Shortcuts[ShortcutCatalog.CtrlClick.Id] = false;
         Assert.False(settings.ToConfig().CtrlClick);
     }
 }

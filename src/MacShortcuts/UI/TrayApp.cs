@@ -8,7 +8,7 @@ namespace MacShortcuts.UI;
 /// <summary>Owns the tray icon, the settings window and the remapper for the app's lifetime.</summary>
 internal sealed class TrayApp : ApplicationContext
 {
-    readonly SettingsController _settings = new(AppSettings.Load(), s => s.Save());
+    readonly SettingsController _settings;
     readonly KeyRemapper _remapper = new();
     readonly NotifyIcon _tray;
     ToolStripMenuItem _enabledItem = null!; // set by BuildMenu
@@ -18,6 +18,7 @@ internal sealed class TrayApp : ApplicationContext
 
     public TrayApp(bool startMinimized)
     {
+        _settings = new SettingsController(AppSettings.Load(), SaveSettings);
         Theming.Apply(_settings.Theme);
         _dark = Theming.IsDark(_settings.Theme);
 
@@ -111,6 +112,19 @@ internal sealed class TrayApp : ApplicationContext
             if (Elevation.TryRestartElevated()) ExitThread();
         };
         return form;
+    }
+
+    void SaveSettings(AppSettings settings)
+    {
+        try
+        {
+            settings.Save();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The change still applies until the app exits.
+            _tray.ShowBalloonTip(3000, "Couldn't save settings", ex.Message, ToolTipIcon.Warning);
+        }
     }
 
     void ShowTrayHint()

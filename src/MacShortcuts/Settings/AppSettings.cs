@@ -8,7 +8,7 @@ public sealed class AppSettings
 {
     static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    static string FilePath => Path.Combine(
+    static readonly string DefaultPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MacShortcuts", "settings.json");
 
     public bool Enabled { get; set; } = true;
@@ -25,24 +25,44 @@ public sealed class AppSettings
     public bool IsEnabled(ShortcutDef shortcut) =>
         Shortcuts.TryGetValue(shortcut.Id, out bool on) ? on : shortcut.DefaultEnabled;
 
-    public static AppSettings Load()
+    public static AppSettings Load() => Load(DefaultPath);
+
+    public void Save() => Save(DefaultPath);
+
+    /// <summary>Returns defaults if the file is missing or unreadable.</summary>
+    internal static AppSettings Load(string path)
     {
+        string json;
         try
         {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), JsonOptions) ?? new();
+            json = File.ReadAllText(path);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Corrupt settings file: fall back to defaults.
+            // Includes a missing file or folder, i.e. the first run.
+            return new();
         }
-        return new();
+
+        try
+        {
+            return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new();
+        }
+        catch (JsonException)
+        {
+            // Keep a copy for the user; the next save overwrites the original with defaults.
+            try { File.Copy(path, path + ".corrupt", overwrite: true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            return new();
+        }
     }
 
-    public void Save()
+    internal void Save(string path)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, JsonOptions));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        // Write a temporary file and swap it in, so a crash mid-write can't leave a truncated file.
+        string temp = path + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(this, JsonOptions));
+        File.Move(temp, path, overwrite: true);
     }
 
     public RemapConfig ToConfig()
@@ -58,7 +78,7 @@ public sealed class AppSettings
             .Where(a => a.Length > 0)
             .ToHashSet();
 
-        bool ctrlClick = ShortcutCatalog.All.Any(s => s.Id == ShortcutCatalog.MouseCtrlClickId && IsEnabled(s));
+        bool ctrlClick = IsEnabled(ShortcutCatalog.CtrlClick);
 
         return new RemapConfig(Enabled, UseLeftAlt, UseRightAlt, ctrlClick, map, excluded);
     }
