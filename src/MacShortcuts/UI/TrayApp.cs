@@ -8,6 +8,7 @@ namespace MacShortcuts.UI;
 /// <summary>Owns the tray icon, the settings window and the remapper for the app's lifetime.</summary>
 internal sealed class TrayApp : ApplicationContext
 {
+    readonly SettingsController _settings = new(AppSettings.Load(), s => s.Save());
     readonly KeyRemapper _remapper = new();
     readonly NotifyIcon _tray;
     ToolStripMenuItem _enabledItem = null!; // set by BuildMenu
@@ -15,21 +16,21 @@ internal sealed class TrayApp : ApplicationContext
     bool _trayHintShown;
     bool _dark;
 
-    public AppSettings Settings { get; } = AppSettings.Load();
-
     public TrayApp(bool startMinimized)
     {
-        Theming.Apply(Settings.Theme);
-        _dark = Theming.IsDark(Settings.Theme);
+        Theming.Apply(_settings.Theme);
+        _dark = Theming.IsDark(_settings.Theme);
 
         _tray = new NotifyIcon { ContextMenuStrip = BuildMenu(), Visible = true };
         _tray.MouseClick += (_, e) =>
         {
             if (e.Button == MouseButtons.Left) ShowSettings();
         };
+        UpdateTrayState();
 
         _remapper.Start();
-        ApplySettings(save: false);
+        _remapper.Update(_settings.ToConfig());
+        _settings.Changed += OnSettingsChanged;
 
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
@@ -37,41 +38,38 @@ internal sealed class TrayApp : ApplicationContext
         if (!startMinimized) ShowSettings();
     }
 
-    public void SetEnabled(bool enabled)
+    public void ShowSettings()
     {
-        Settings.Enabled = enabled;
-        ApplySettings();
+        if (_form == null || _form.IsDisposed) _form = CreateForm();
+        _form.Show();
+        if (_form.WindowState == FormWindowState.Minimized) _form.WindowState = FormWindowState.Normal;
+        _form.Activate();
     }
 
-    /// <summary>Persist settings and push them to the running hook.</summary>
-    public void ApplySettings(bool save = true)
+    void OnSettingsChanged(object? sender, EventArgs e)
     {
-        if (save) Settings.Save();
-        _remapper.Update(Settings.ToConfig());
-
-        _enabledItem.Checked = Settings.Enabled;
-        _tray.Icon = Settings.Enabled ? AppIcons.Enabled : AppIcons.Disabled;
-        _tray.Text = Settings.Enabled ? "Mac Shortcuts (on)" : "Mac Shortcuts (off)";
-        _form?.SyncEnabled();
+        _remapper.Update(_settings.ToConfig());
+        UpdateTrayState();
+        if (Theming.IsDark(_settings.Theme) != _dark) ApplyTheme();
     }
 
-    public void SetTheme(AppTheme theme)
+    void UpdateTrayState()
     {
-        Settings.Theme = theme;
-        Settings.Save();
-        ApplyTheme();
+        bool enabled = _settings.Enabled;
+        _enabledItem.Checked = enabled;
+        _tray.Icon = enabled ? AppIcons.Enabled : AppIcons.Disabled;
+        _tray.Text = enabled ? "Mac Shortcuts (on)" : "Mac Shortcuts (off)";
     }
 
     /// <summary>Theme changes only affect new windows, so rebuild the menu and settings window.</summary>
     void ApplyTheme()
     {
-        _dark = Theming.IsDark(Settings.Theme);
-        Theming.Apply(Settings.Theme);
+        _dark = Theming.IsDark(_settings.Theme);
+        Theming.Apply(_settings.Theme);
 
         var oldMenu = _tray.ContextMenuStrip;
         _tray.ContextMenuStrip = BuildMenu();
         oldMenu?.Dispose();
-        _enabledItem.Checked = Settings.Enabled;
 
         if (_form == null || _form.IsDisposed) return;
         bool visible = _form.Visible;
@@ -81,7 +79,9 @@ internal sealed class TrayApp : ApplicationContext
         _form = null;
         if (!visible) return;
 
-        _form = new MainForm(this) { StartPosition = FormStartPosition.Manual, Bounds = bounds };
+        _form = CreateForm();
+        _form.StartPosition = FormStartPosition.Manual;
+        _form.Bounds = bounds;
         _form.Show();
         if (state == FormWindowState.Maximized) _form.WindowState = state;
         _form.Activate();
@@ -89,7 +89,10 @@ internal sealed class TrayApp : ApplicationContext
 
     ContextMenuStrip BuildMenu()
     {
-        _enabledItem = new ToolStripMenuItem("Enabled", null, (_, _) => SetEnabled(!Settings.Enabled));
+        _enabledItem = new ToolStripMenuItem("Enabled", null, (_, _) => _settings.SetEnabled(!_settings.Enabled))
+        {
+            Checked = _settings.Enabled,
+        };
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Settings…", null, (_, _) => ShowSettings());
@@ -99,15 +102,18 @@ internal sealed class TrayApp : ApplicationContext
         return menu;
     }
 
-    public void ShowSettings()
+    MainForm CreateForm()
     {
-        if (_form == null || _form.IsDisposed) _form = new MainForm(this);
-        _form.Show();
-        if (_form.WindowState == FormWindowState.Minimized) _form.WindowState = FormWindowState.Normal;
-        _form.Activate();
+        var form = new MainForm(_settings);
+        form.HiddenToTray += (_, _) => ShowTrayHint();
+        form.RestartAsAdminRequested += (_, _) =>
+        {
+            if (Elevation.TryRestartElevated()) ExitThread();
+        };
+        return form;
     }
 
-    public void OnSettingsHidden()
+    void ShowTrayHint()
     {
         if (_trayHintShown) return;
         _trayHintShown = true;
@@ -115,30 +121,27 @@ internal sealed class TrayApp : ApplicationContext
             "It keeps working from the system tray. Right-click the tray icon to exit.", ToolTipIcon.Info);
     }
 
-    public void RestartAsAdmin()
-    {
-        if (Elevation.TryRestartElevated()) ExitThread();
-    }
-
     void OnSessionSwitch(object? sender, SessionSwitchEventArgs e) => _remapper.ResetKeyState();
 
     void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
     {
         // Follow Windows switching between light and dark app mode.
-        if (e.Category == UserPreferenceCategory.General && Settings.Theme == AppTheme.System
+        if (e.Category == UserPreferenceCategory.General && _settings.Theme == AppTheme.System
             && Theming.SystemIsDark != _dark)
             ApplyTheme();
     }
 
     protected override void ExitThreadCore()
     {
+        _settings.Changed -= OnSettingsChanged;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        // Disposing the form saves any pending excluded-apps edit.
+        _form?.Dispose();
         _remapper.Dispose();
         _tray.Visible = false;
         _tray.ContextMenuStrip?.Dispose();
         _tray.Dispose();
-        _form?.Dispose();
         base.ExitThreadCore();
     }
 }

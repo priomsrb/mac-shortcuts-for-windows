@@ -7,7 +7,7 @@ namespace MacShortcuts.UI;
 
 internal sealed class MainForm : Form
 {
-    readonly TrayApp _app;
+    readonly SettingsController _settings;
     readonly CheckBox _enabled;
     readonly CheckBox _leftAlt;
     readonly CheckBox _rightAlt;
@@ -18,11 +18,14 @@ internal sealed class MainForm : Form
     readonly System.Windows.Forms.Timer _excludedSaveTimer = new() { Interval = 600 };
     bool _loading;
 
-    AppSettings Settings => _app.Settings;
+    /// <summary>The user closed the window; the app keeps running in the tray.</summary>
+    public event EventHandler? HiddenToTray;
 
-    public MainForm(TrayApp app)
+    public event EventHandler? RestartAsAdminRequested;
+
+    public MainForm(SettingsController settings)
     {
-        _app = app;
+        _settings = settings;
 
         Text = "Mac Shortcuts for Windows";
         Icon = AppIcons.Enabled;
@@ -68,7 +71,7 @@ internal sealed class MainForm : Form
             var adminLink = new LinkLabel { Text = "Restart as administrator", AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
             if (Application.IsDarkModeEnabled) adminLink.LinkColor = adminLink.ActiveLinkColor = Theming.DarkAccentText;
             tips.SetToolTip(adminLink, "Needed for shortcuts to work while an admin app (Task Manager, admin terminal…) is focused.");
-            adminLink.LinkClicked += (_, _) => _app.RestartAsAdmin();
+            adminLink.LinkClicked += (_, _) => RestartAsAdminRequested?.Invoke(this, EventArgs.Empty);
             options.Controls.Add(adminLink);
         }
         root.Controls.Add(options);
@@ -134,9 +137,9 @@ internal sealed class MainForm : Form
 
         // Buttons
         var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 10, 0, 0) };
-        buttons.Controls.Add(MakeButton("Enable all", (_, _) => SetAll(true)));
-        buttons.Controls.Add(MakeButton("Disable all", (_, _) => SetAll(false)));
-        buttons.Controls.Add(MakeButton("Reset to defaults", (_, _) => ResetDefaults()));
+        buttons.Controls.Add(MakeButton("Enable all", (_, _) => _settings.SetAllShortcutsEnabled(true)));
+        buttons.Controls.Add(MakeButton("Disable all", (_, _) => _settings.SetAllShortcutsEnabled(false)));
+        buttons.Controls.Add(MakeButton("Reset to defaults", (_, _) => _settings.ResetShortcuts()));
         buttons.Controls.Add(new Label
         {
             Text = "Changes apply immediately. Closing this window keeps the app running in the tray.",
@@ -147,21 +150,14 @@ internal sealed class MainForm : Form
         root.Controls.Add(buttons);
 
         LoadFromSettings();
+        _settings.Changed += OnSettingsChanged;
 
-        _enabled.CheckedChanged += (_, _) => { if (!_loading) _app.SetEnabled(_enabled.Checked); };
-        _leftAlt.CheckedChanged += (_, _) => { if (!_loading) { Settings.UseLeftAlt = _leftAlt.Checked; _app.ApplySettings(); } };
-        _rightAlt.CheckedChanged += (_, _) => { if (!_loading) { Settings.UseRightAlt = _rightAlt.Checked; _app.ApplySettings(); } };
+        _enabled.CheckedChanged += (_, _) => { if (!_loading) _settings.SetEnabled(_enabled.Checked); };
+        _leftAlt.CheckedChanged += (_, _) => { if (!_loading) _settings.SetUseLeftAlt(_leftAlt.Checked); };
+        _rightAlt.CheckedChanged += (_, _) => { if (!_loading) _settings.SetUseRightAlt(_rightAlt.Checked); };
         _startup.CheckedChanged += (_, _) => { if (!_loading) SetStartup(_startup.Checked); };
         // Deferred: applying a theme recreates this window.
-        _theme.SelectedIndexChanged += (_, _) => { if (!_loading) BeginInvoke(() => _app.SetTheme((AppTheme)_theme.SelectedIndex)); };
-    }
-
-    /// <summary>Called by the tray when "Enabled" is toggled there.</summary>
-    public void SyncEnabled()
-    {
-        _loading = true;
-        _enabled.Checked = Settings.Enabled;
-        _loading = false;
+        _theme.SelectedIndexChanged += (_, _) => { if (!_loading) BeginInvoke(() => _settings.SetTheme((AppTheme)_theme.SelectedIndex)); };
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -171,7 +167,7 @@ internal sealed class MainForm : Form
         {
             e.Cancel = true;
             Hide();
-            _app.OnSettingsHidden();
+            HiddenToTray?.Invoke(this, EventArgs.Empty);
         }
         base.OnFormClosing(e);
     }
@@ -182,6 +178,7 @@ internal sealed class MainForm : Form
         if (disposing)
         {
             SaveExcluded();
+            _settings.Changed -= OnSettingsChanged;
             _excludedSaveTimer.Dispose();
         }
         base.Dispose(disposing);
@@ -196,45 +193,45 @@ internal sealed class MainForm : Form
     void LoadFromSettings()
     {
         _loading = true;
-        _enabled.Checked = Settings.Enabled;
-        _leftAlt.Checked = Settings.UseLeftAlt;
-        _rightAlt.Checked = Settings.UseRightAlt;
         _startup.Checked = StartWithWindows.IsEnabled;
-        _theme.SelectedIndex = (int)Settings.Theme;
+        _theme.SelectedIndex = (int)_settings.Theme;
+        _excluded.Text = string.Join(Environment.NewLine, _settings.ExcludedApps);
+        _loading = false;
+        SyncToggles();
+    }
+
+    /// <summary>Settings can also change from the tray menu or the buttons below the list.</summary>
+    void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        // A handler that ran before this one may have disposed the window (e.g. to apply a theme).
+        if (!IsDisposed) SyncToggles();
+    }
+
+    /// <summary>
+    /// Updates the checkboxes. The excluded-apps text is left alone so typing in it isn't disturbed,
+    /// and the theme can only change here.
+    /// </summary>
+    void SyncToggles()
+    {
+        _loading = true;
+        _enabled.Checked = _settings.Enabled;
+        _leftAlt.Checked = _settings.UseLeftAlt;
+        _rightAlt.Checked = _settings.UseRightAlt;
         foreach (ListViewItem item in _list.Items)
-            item.Checked = Settings.IsEnabled((ShortcutDef)item.Tag!);
-        _excluded.Text = string.Join(Environment.NewLine, Settings.ExcludedApps);
+            item.Checked = _settings.IsEnabled((ShortcutDef)item.Tag!);
         _loading = false;
     }
 
     void OnItemChecked(object? sender, ItemCheckedEventArgs e)
     {
         if (_loading) return;
-        Settings.Shortcuts[((ShortcutDef)e.Item.Tag!).Id] = e.Item.Checked;
-        _app.ApplySettings();
-    }
-
-    void SetAll(bool enabled)
-    {
-        foreach (var shortcut in ShortcutCatalog.All) Settings.Shortcuts[shortcut.Id] = enabled;
-        _app.ApplySettings();
-        LoadFromSettings();
-    }
-
-    void ResetDefaults()
-    {
-        Settings.Shortcuts.Clear();
-        _app.ApplySettings();
-        LoadFromSettings();
+        _settings.SetShortcutEnabled((ShortcutDef)e.Item.Tag!, e.Item.Checked);
     }
 
     void SaveExcluded()
     {
         _excludedSaveTimer.Stop();
-        var apps = _excluded.Lines.Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
-        if (apps.SequenceEqual(Settings.ExcludedApps)) return;
-        Settings.ExcludedApps = apps;
-        _app.ApplySettings();
+        _settings.SetExcludedApps(_excluded.Lines.Select(l => l.Trim()).Where(l => l.Length > 0).ToList());
     }
 
     void SetStartup(bool enabled)
