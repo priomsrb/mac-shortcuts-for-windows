@@ -240,8 +240,8 @@ public class RemapEngineTests
         Release(vk);
     }
 
-    static SyntheticInput KeyDown(int vk) => new SyntheticInput.Key(vk, Up: false);
-    static SyntheticInput KeyUp(int vk) => new SyntheticInput.Key(vk, Up: true);
+    static SyntheticInput.Key KeyDown(int vk) => new SyntheticInput.Key(vk, Up: false);
+    static SyntheticInput.Key KeyUp(int vk) => new SyntheticInput.Key(vk, Up: true);
 
     /// <summary>Tapping the mask key, then releasing Alt so Windows sees it lifted.</summary>
     static SyntheticInput[] ReleasedAlt(int altVk) => [KeyDown(Mask), KeyUp(Mask), KeyUp(altVk)];

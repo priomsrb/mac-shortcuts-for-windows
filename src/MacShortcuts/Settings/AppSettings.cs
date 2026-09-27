@@ -74,7 +74,7 @@ public sealed class AppSettings
 
         var excluded = ExcludedApps
             .Select(a => a.Trim().ToLowerInvariant())
-            .Select(a => a.EndsWith(".exe") ? a[..^4] : a)
+            .Select(a => a.EndsWith(".exe", StringComparison.Ordinal) ? a[..^4] : a)
             .Where(a => a.Length > 0)
             .ToHashSet();
 

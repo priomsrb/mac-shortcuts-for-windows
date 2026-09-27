@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace MacShortcuts.Shortcuts;
 
 public static class ShortcutCatalog
@@ -125,6 +127,6 @@ public static class ShortcutCatalog
         new(new Trigger(from, shift), new SendKeysAction(to));
 
     static string KeyName(Keys key) => key is >= Keys.D0 and <= Keys.D9
-        ? ((int)(key - Keys.D0)).ToString()
+        ? ((int)(key - Keys.D0)).ToString(CultureInfo.InvariantCulture)
         : key.ToString();
 }

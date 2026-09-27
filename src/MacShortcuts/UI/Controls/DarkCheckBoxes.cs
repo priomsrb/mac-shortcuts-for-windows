@@ -22,7 +22,7 @@ internal static class DarkCheckBoxes
             Replace(imageList, 1, theme, CBS_CHECKEDNORMAL, width, height);
             return true;
         }
-        finally { CloseThemeData(theme); }
+        finally { _ = CloseThemeData(theme); }
     }
 
     static void Replace(IntPtr imageList, int index, IntPtr theme, int state, int width, int height)

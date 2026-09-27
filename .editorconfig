@@ -1,0 +1,68 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+[*.{csproj,props,slnx,xml,json}]
+indent_size = 2
+
+[*.cs]
+# Layout
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+
+# Modifiers: members omit "private"; top-level types state "internal" explicitly.
+# (No editorconfig option expresses that mix, so it is a convention rather than a rule.)
+csharp_preferred_modifier_order = public,private,protected,internal,file,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,required,volatile,async:warning
+
+# var: explicit for built-in types, var where the type is apparent or unwieldy
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Expression bodies for one-liners
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+
+# Naming: _camelCase for private instance fields, PascalCase for types and members
+dotnet_diagnostic.IDE1006.severity = warning
+dotnet_naming_rule.instance_fields_underscore.severity = warning
+dotnet_naming_rule.instance_fields_underscore.symbols = instance_fields
+dotnet_naming_rule.instance_fields_underscore.style = underscore_camel_case
+dotnet_naming_symbols.instance_fields.applicable_kinds = field
+dotnet_naming_symbols.instance_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+# Static fields are PascalCase; consts are free-form so Win32 names (WM_REFLECT_NOTIFY) can be kept.
+dotnet_naming_rule.const_fields_any.severity = none
+dotnet_naming_rule.const_fields_any.symbols = const_fields
+dotnet_naming_rule.const_fields_any.style = pascal_case
+dotnet_naming_symbols.const_fields.applicable_kinds = field
+dotnet_naming_symbols.const_fields.required_modifiers = const
+
+dotnet_naming_rule.static_fields_pascal.severity = warning
+dotnet_naming_rule.static_fields_pascal.symbols = static_fields
+dotnet_naming_rule.static_fields_pascal.style = pascal_case
+dotnet_naming_symbols.static_fields.applicable_kinds = field
+dotnet_naming_symbols.static_fields.required_modifiers = static
+
+dotnet_naming_rule.types_and_members_pascal.severity = warning
+dotnet_naming_rule.types_and_members_pascal.symbols = types_and_members
+dotnet_naming_rule.types_and_members_pascal.style = pascal_case
+dotnet_naming_symbols.types_and_members.applicable_kinds = class,struct,interface,enum,delegate,method,property,event
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+# Win32 interop mirrors the Windows headers (VK_LSHIFT, KBDLLHOOKSTRUCT, vkCode, ...).
+[src/MacShortcuts/Interop/**.cs]
+dotnet_naming_rule.types_and_members_pascal.severity = none
+dotnet_diagnostic.CA1707.severity = none
+
+# Tests are named Method_Scenario_Expectation.
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none
