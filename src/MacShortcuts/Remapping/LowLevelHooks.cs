@@ -7,9 +7,10 @@ namespace MacShortcuts.Remapping;
 
 /// <summary>
 /// Installs low-level keyboard and mouse hooks on a dedicated thread with its own message loop,
-/// so input keeps flowing even while the UI thread is busy.
+/// so input keeps flowing even while the UI thread is busy. Only one instance can run at a time,
+/// since the native callbacks have no context to find it by.
 /// </summary>
-internal sealed class LowLevelHooks : IDisposable
+internal sealed unsafe class LowLevelHooks : IDisposable
 {
     /// <returns>true to swallow the event.</returns>
     public delegate bool KeyHandler(in KBDLLHOOKSTRUCT key);
@@ -17,12 +18,10 @@ internal sealed class LowLevelHooks : IDisposable
     /// <returns>true to swallow the event.</returns>
     public delegate bool MouseHandler(IntPtr message, in MSLLHOOKSTRUCT mouse);
 
+    static LowLevelHooks? Current;
+
     readonly KeyHandler _onKey;
     readonly MouseHandler _onMouse;
-
-    // Kept in fields so the delegates outlive the native hooks that call them.
-    readonly HookProc _keyboardProc;
-    readonly HookProc _mouseProc;
     Thread? _thread;
     uint _threadId;
 
@@ -30,19 +29,20 @@ internal sealed class LowLevelHooks : IDisposable
     {
         _onKey = onKey;
         _onMouse = onMouse;
-        _keyboardProc = KeyboardProc;
-        _mouseProc = MouseProc;
     }
 
     public void Start()
     {
+        if (Interlocked.CompareExchange(ref Current, this, null) != null)
+            throw new InvalidOperationException("Hooks are already installed.");
+
         using var ready = new ManualResetEventSlim();
         _thread = new Thread(() =>
         {
             _threadId = GetCurrentThreadId();
             var module = GetModuleHandle(null);
-            var kb = SetWindowsHookEx(WH_KEYBOARD_LL, Marshal.GetFunctionPointerForDelegate(_keyboardProc), module, 0);
-            var mouse = SetWindowsHookEx(WH_MOUSE_LL, Marshal.GetFunctionPointerForDelegate(_mouseProc), module, 0);
+            var kb = SetWindowsHookEx(WH_KEYBOARD_LL, &KeyboardProc, module, 0);
+            var mouse = SetWindowsHookEx(WH_MOUSE_LL, &MouseProc, module, 0);
             ready.Set();
 
             while (GetMessage(out _, IntPtr.Zero, 0, 0) > 0) { }
@@ -65,16 +65,17 @@ internal sealed class LowLevelHooks : IDisposable
         PostThreadMessage(_threadId, WM_QUIT, IntPtr.Zero, IntPtr.Zero);
         _thread.Join(1000);
         _thread = null;
+        Interlocked.CompareExchange(ref Current, null, this);
     }
 
-    IntPtr KeyboardProc(int nCode, IntPtr wParam, IntPtr lParam)
+    [UnmanagedCallersOnly]
+    static IntPtr KeyboardProc(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0)
+        if (nCode >= 0 && Current is { } hooks)
         {
-            var k = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
             try
             {
-                if (_onKey(k)) return 1;
+                if (hooks._onKey(in *(KBDLLHOOKSTRUCT*)lParam)) return 1;
             }
             catch (Exception ex)
             {
@@ -85,14 +86,14 @@ internal sealed class LowLevelHooks : IDisposable
         return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
     }
 
-    IntPtr MouseProc(int nCode, IntPtr wParam, IntPtr lParam)
+    [UnmanagedCallersOnly]
+    static IntPtr MouseProc(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0)
+        if (nCode >= 0 && Current is { } hooks)
         {
-            var m = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
             try
             {
-                if (_onMouse(wParam, m)) return 1;
+                if (hooks._onMouse(wParam, in *(MSLLHOOKSTRUCT*)lParam)) return 1;
             }
             catch (Exception ex)
             {

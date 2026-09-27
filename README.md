@@ -12,11 +12,13 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 dotnet run --project src/MacShortcuts
 ```
 
-Standalone `.exe` (no .NET install needed on the target machine):
+Standalone `.exe` (a ~2.5 MB native binary; no .NET install needed on the target machine):
 
 ```bash
-dotnet publish src/MacShortcuts -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+dotnet publish src/MacShortcuts -c Release -r win-x64 -o publish
 ```
+
+This uses [Native AOT](https://learn.microsoft.com/dotnet/core/deploying/native-aot/), which also needs the Visual Studio **Desktop development with C++** workload (or the C++ Build Tools) for the linker. With the VS 2019 Build Tools, run it from PowerShell or cmd with `%ProgramFiles(x86)%\Microsoft Visual Studio\Installer` on `PATH`; otherwise the linker lookup fails with "'vswhere.exe' is not recognized".
 
 ## Usage
 

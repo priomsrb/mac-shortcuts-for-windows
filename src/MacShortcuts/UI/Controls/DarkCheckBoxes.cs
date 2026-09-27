@@ -6,14 +6,16 @@ using static MacShortcuts.Interop.UxTheme;
 
 namespace MacShortcuts.UI.Controls;
 
-/// <summary>Draws checkbox glyphs from the Windows dark theme into a native image list.</summary>
+/// <summary>Draws checkbox glyphs from the Windows dark theme.</summary>
 internal static class DarkCheckBoxes
 {
+    const string ThemeClass = "DarkMode_Explorer::Button";
+
     /// <summary>Overwrites images 0 (unchecked) and 1 (checked), the ListView state image layout.</summary>
     /// <returns>false if this version of Windows has no dark theme.</returns>
     public static bool Draw(IntPtr imageList, int dpi)
     {
-        IntPtr theme = OpenThemeDataForDpi(IntPtr.Zero, "DarkMode_Explorer::Button", dpi);
+        IntPtr theme = OpenThemeDataForDpi(IntPtr.Zero, ThemeClass, dpi);
         if (theme == IntPtr.Zero) return false;
         try
         {
@@ -21,6 +23,27 @@ internal static class DarkCheckBoxes
             Replace(imageList, 0, theme, CBS_UNCHECKEDNORMAL, width, height);
             Replace(imageList, 1, theme, CBS_CHECKEDNORMAL, width, height);
             return true;
+        }
+        finally { _ = CloseThemeData(theme); }
+    }
+
+    /// <summary>Draws one glyph vertically centred at the left of <paramref name="bounds"/>.</summary>
+    /// <returns>The glyph's width, or 0 if this version of Windows has no dark theme.</returns>
+    public static int DrawGlyph(IntPtr hdc, RECT bounds, bool isChecked, bool hot, bool pressed, int dpi)
+    {
+        IntPtr theme = OpenThemeDataForDpi(IntPtr.Zero, ThemeClass, dpi);
+        if (theme == IntPtr.Zero) return 0;
+        try
+        {
+            // The checked states follow the four unchecked ones.
+            int state = (isChecked ? CBS_CHECKEDNORMAL : CBS_UNCHECKEDNORMAL)
+                + (pressed ? CBS_UNCHECKEDPRESSED - 1 : hot ? CBS_UNCHECKEDHOT - 1 : 0);
+            GetThemePartSize(theme, hdc, BP_CHECKBOX, state, IntPtr.Zero, TS_DRAW, out var glyph);
+            var rect = new RECT { left = bounds.left, top = bounds.top + (bounds.bottom - bounds.top - glyph.cy) / 2 };
+            rect.right = rect.left + glyph.cx;
+            rect.bottom = rect.top + glyph.cy;
+            DrawThemeBackground(theme, hdc, BP_CHECKBOX, state, ref rect, IntPtr.Zero);
+            return glyph.cx;
         }
         finally { _ = CloseThemeData(theme); }
     }

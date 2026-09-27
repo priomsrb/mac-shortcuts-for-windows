@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using MacShortcuts.Interop;
+using MacShortcuts.Shortcuts;
 using static MacShortcuts.Interop.User32;
 
 namespace MacShortcuts.Remapping;

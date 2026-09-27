@@ -1,16 +1,37 @@
+using MacShortcuts.Interop;
 using MacShortcuts.Settings;
 using Microsoft.Win32;
+using static MacShortcuts.Interop.Gdi32;
+using static MacShortcuts.Interop.User32;
 
 namespace MacShortcuts.UI;
 
+/// <summary>The colours a window is painted with (COLORREFs).</summary>
+internal readonly record struct Palette(bool IsDark, uint Window, uint Control, uint Text, uint GrayText, uint Accent, uint Border)
+{
+    public static Palette Light => new(false,
+        Window: GetSysColor(COLOR_BTNFACE),
+        Control: GetSysColor(COLOR_WINDOW),
+        Text: GetSysColor(COLOR_WINDOWTEXT),
+        GrayText: GetSysColor(COLOR_GRAYTEXT),
+        Accent: GetSysColor(COLOR_WINDOWTEXT),
+        Border: GetSysColor(COLOR_3DSHADOW));
+
+    public static Palette Dark { get; } = new(true,
+        Window: Rgb(0x20, 0x20, 0x20),
+        Control: Rgb(0x19, 0x19, 0x19),
+        Text: Rgb(0xF0, 0xF0, 0xF0),
+        GrayText: Rgb(0x9A, 0x9A, 0x9A),
+        // Readable replacement for the default dark-blue header text on dark backgrounds.
+        Accent: Rgb(0x99, 0xEB, 0xFF),
+        // Subtle frame and divider colour on dark backgrounds.
+        Border: Rgb(0x55, 0x55, 0x55));
+
+    public static Palette For(bool dark) => dark ? Dark : Light;
+}
+
 internal static class Theming
 {
-    /// <summary>Readable replacement for the default dark-blue link/header text on dark backgrounds.</summary>
-    public static Color DarkAccentText { get; } = Color.FromArgb(0x99, 0xEB, 0xFF);
-
-    /// <summary>Subtle frame and divider colour on dark backgrounds.</summary>
-    public static Color DarkBorder { get; } = Color.FromArgb(0x55, 0x55, 0x55);
-
     const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
     /// <summary>Whether Windows is set to dark mode for apps ("Choose your app mode").</summary>
@@ -30,7 +51,6 @@ internal static class Theming
         _ => SystemIsDark,
     };
 
-    /// <summary>Applies to windows and menus created after this call.</summary>
-    public static void Apply(AppTheme theme) =>
-        Application.SetColorMode(IsDark(theme) ? SystemColorMode.Dark : SystemColorMode.Classic);
+    /// <summary>Applies to menus created after this call; windows theme themselves when created.</summary>
+    public static void Apply(AppTheme theme) => UxTheme.SetAppDarkMode(IsDark(theme));
 }

@@ -1,20 +1,34 @@
+using System.Runtime.InteropServices;
 using MacShortcuts.Platform;
 using MacShortcuts.Remapping;
 using MacShortcuts.Settings;
-using Microsoft.Win32;
+using static MacShortcuts.Interop.Shell32;
+using static MacShortcuts.Interop.User32;
+using static MacShortcuts.Interop.WtsApi32;
 
 namespace MacShortcuts.UI;
 
-/// <summary>Owns the tray icon, the settings window and the remapper for the app's lifetime.</summary>
-internal sealed class TrayApp : ApplicationContext
+/// <summary>
+/// Owns the tray icon, the settings window and the remapper for the app's lifetime, through a
+/// hidden top-level window (it must be top-level to receive broadcasts like WM_SETTINGCHANGE).
+/// </summary>
+internal sealed class TrayApp : Window, IDisposable
 {
+    const int WM_TRAY = WM_APP + 1;
+    const int WM_SHOW_SETTINGS = WM_APP + 2;
+    const int WM_QUERYENDSESSION = 0x0011;
+    const int WM_ENDSESSION = 0x0016;
+    const int MenuSettings = 1, MenuEnabled = 2, MenuExit = 3;
+
+    static readonly uint TaskbarCreated = RegisterWindowMessage("TaskbarCreated");
+
     readonly SettingsController _settings;
     readonly KeyRemapper _remapper = new();
-    readonly NotifyIcon _tray;
-    ToolStripMenuItem _enabledItem = null!; // set by BuildMenu
-    MainForm? _form;
+    readonly TrayIcon _tray;
+    MainWindow? _window;
     bool _trayHintShown;
     bool _dark;
+    bool _exited;
 
     public TrayApp(bool startMinimized)
     {
@@ -22,29 +36,87 @@ internal sealed class TrayApp : ApplicationContext
         Theming.Apply(_settings.Theme);
         _dark = Theming.IsDark(_settings.Theme);
 
-        _tray = new NotifyIcon { ContextMenuStrip = BuildMenu(), Visible = true };
-        _tray.MouseClick += (_, e) =>
-        {
-            if (e.Button == MouseButtons.Left) ShowSettings();
-        };
+        CreateHandle("MacShortcuts.Tray", "Mac Shortcuts", WS_POPUP, WS_EX_TOOLWINDOW);
+        WTSRegisterSessionNotification(Handle, NOTIFY_FOR_THIS_SESSION);
+        _tray = new TrayIcon(Handle, WM_TRAY);
         UpdateTrayState();
 
         _remapper.Start();
         _remapper.Update(_settings.ToConfig());
         _settings.Changed += OnSettingsChanged;
 
-        SystemEvents.SessionSwitch += OnSessionSwitch;
-        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
-
         if (!startMinimized) ShowSettings();
     }
 
+    /// <summary>Runs the message loop until the user exits.</summary>
+    public void Run()
+    {
+        while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
+        {
+            // Tab and arrow-key navigation between the settings window's controls.
+            if (_window is { Handle: var dialog } && dialog != IntPtr.Zero && IsDialogMessage(dialog, msg)) continue;
+            TranslateMessage(msg);
+            DispatchMessage(msg);
+        }
+    }
+
+    /// <summary>Shows the settings window. Can be called from any thread.</summary>
+    public void RequestShowSettings() => PostMessage(Handle, WM_SHOW_SETTINGS, IntPtr.Zero, IntPtr.Zero);
+
     public void ShowSettings()
     {
-        if (_form == null || _form.IsDisposed) _form = CreateForm();
-        _form.Show();
-        if (_form.WindowState == FormWindowState.Minimized) _form.WindowState = FormWindowState.Normal;
-        _form.Activate();
+        _window ??= CreateWindow(placement: null);
+        _window.Show();
+    }
+
+    protected override IntPtr WndProc(uint msg, IntPtr wParam, IntPtr lParam)
+    {
+        switch (msg)
+        {
+            case WM_TRAY:
+                switch (LoWord(lParam))
+                {
+                    case NIN_SELECT or NIN_KEYSELECT:
+                        ShowSettings();
+                        break;
+                    case WM_CONTEXTMENU:
+                        ShowMenu(LoWord(wParam), HiWord(wParam));
+                        break;
+                }
+                return 0;
+
+            case WM_SHOW_SETTINGS:
+                ShowSettings();
+                return 0;
+
+            case WM_WTSSESSION_CHANGE:
+                // Key-ups are missed while the session is locked or switched away.
+                _remapper.ResetKeyState();
+                return 0;
+
+            case WM_SETTINGCHANGE:
+                // Follow Windows switching between light and dark app mode.
+                if (lParam != IntPtr.Zero && Marshal.PtrToStringUni(lParam) == "ImmersiveColorSet"
+                    && _settings.Theme == AppTheme.System && Theming.SystemIsDark != _dark)
+                    ApplyTheme();
+                return 0;
+
+            case WM_QUERYENDSESSION:
+                return 1;
+
+            case WM_ENDSESSION:
+                // Windows is signing out: save any pending edit before the process is ended.
+                if (wParam != IntPtr.Zero) Exit();
+                return 0;
+        }
+
+        if (msg == TaskbarCreated)
+        {
+            // Explorer restarted, taking the tray icon with it.
+            _tray.Recreate();
+            return 0;
+        }
+        return base.WndProc(msg, wParam, lParam);
     }
 
     void OnSettingsChanged(object? sender, EventArgs e)
@@ -57,61 +129,58 @@ internal sealed class TrayApp : ApplicationContext
     void UpdateTrayState()
     {
         bool enabled = _settings.Enabled;
-        _enabledItem.Checked = enabled;
-        _tray.Icon = enabled ? AppIcons.Enabled : AppIcons.Disabled;
-        _tray.Text = enabled ? "Mac Shortcuts (on)" : "Mac Shortcuts (off)";
+        _tray.Update(enabled ? AppIcons.Small : AppIcons.SmallDisabled,
+            enabled ? "Mac Shortcuts (on)" : "Mac Shortcuts (off)");
     }
 
-    /// <summary>Theme changes only affect new windows, so rebuild the menu and settings window.</summary>
+    /// <summary>Controls take their theme when created, so recreate the settings window.</summary>
     void ApplyTheme()
     {
         _dark = Theming.IsDark(_settings.Theme);
         Theming.Apply(_settings.Theme);
 
-        var oldMenu = _tray.ContextMenuStrip;
-        _tray.ContextMenuStrip = BuildMenu();
-        oldMenu?.Dispose();
-
-        if (_form == null || _form.IsDisposed) return;
-        bool visible = _form.Visible;
-        var bounds = _form.WindowState == FormWindowState.Normal ? _form.Bounds : _form.RestoreBounds;
-        var state = _form.WindowState;
-        _form.Dispose();
-        _form = null;
+        if (_window == null) return;
+        bool visible = _window.IsVisible;
+        var placement = _window.Placement;
+        _window.Destroy();
+        _window = null;
         if (!visible) return;
 
-        _form = CreateForm();
-        _form.StartPosition = FormStartPosition.Manual;
-        _form.Bounds = bounds;
-        _form.Show();
-        if (state == FormWindowState.Maximized) _form.WindowState = state;
-        _form.Activate();
+        _window = CreateWindow(placement);
+        _window.Show();
     }
 
-    ContextMenuStrip BuildMenu()
+    void ShowMenu(int x, int y)
     {
-        _enabledItem = new ToolStripMenuItem("Enabled", null, (_, _) => _settings.SetEnabled(!_settings.Enabled))
-        {
-            Checked = _settings.Enabled,
-        };
+        IntPtr menu = CreatePopupMenu();
+        AppendMenu(menu, MF_STRING, MenuSettings, "Settings…");
+        AppendMenu(menu, MF_STRING | (_settings.Enabled ? MF_CHECKED : 0), MenuEnabled, "Enabled");
+        AppendMenu(menu, MF_SEPARATOR, 0, null);
+        AppendMenu(menu, MF_STRING, MenuExit, "Exit");
 
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("Settings…", null, (_, _) => ShowSettings());
-        menu.Items.Add(_enabledItem);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => ExitThread());
-        return menu;
+        // Without this the menu doesn't close when the user clicks elsewhere.
+        SetForegroundWindow(Handle);
+        int command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, x, y, Handle, IntPtr.Zero);
+        PostMessage(Handle, WM_NULL, IntPtr.Zero, IntPtr.Zero);
+        DestroyMenu(menu);
+
+        switch (command)
+        {
+            case MenuSettings: ShowSettings(); break;
+            case MenuEnabled: _settings.SetEnabled(!_settings.Enabled); break;
+            case MenuExit: Exit(); break;
+        }
     }
 
-    MainForm CreateForm()
+    MainWindow CreateWindow(WINDOWPLACEMENT? placement)
     {
-        var form = new MainForm(_settings);
-        form.HiddenToTray += (_, _) => ShowTrayHint();
-        form.RestartAsAdminRequested += (_, _) =>
+        var window = new MainWindow(_settings, _dark, placement);
+        window.HiddenToTray += (_, _) => ShowTrayHint();
+        window.RestartAsAdminRequested += (_, _) =>
         {
-            if (Elevation.TryRestartElevated()) ExitThread();
+            if (Elevation.TryRestartElevated()) Exit();
         };
-        return form;
+        return window;
     }
 
     void SaveSettings(AppSettings settings)
@@ -123,7 +192,7 @@ internal sealed class TrayApp : ApplicationContext
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // The change still applies until the app exits.
-            _tray.ShowBalloonTip(3000, "Couldn't save settings", ex.Message, ToolTipIcon.Warning);
+            _tray.ShowBalloon("Couldn't save settings", ex.Message, warning: true);
         }
     }
 
@@ -131,31 +200,24 @@ internal sealed class TrayApp : ApplicationContext
     {
         if (_trayHintShown) return;
         _trayHintShown = true;
-        _tray.ShowBalloonTip(3000, "Mac Shortcuts is still running",
-            "It keeps working from the system tray. Right-click the tray icon to exit.", ToolTipIcon.Info);
+        _tray.ShowBalloon("Mac Shortcuts is still running",
+            "It keeps working from the system tray. Right-click the tray icon to exit.", warning: false);
     }
 
-    void OnSessionSwitch(object? sender, SessionSwitchEventArgs e) => _remapper.ResetKeyState();
+    public void Dispose() => Exit();
 
-    void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
+    void Exit()
     {
-        // Follow Windows switching between light and dark app mode.
-        if (e.Category == UserPreferenceCategory.General && _settings.Theme == AppTheme.System
-            && Theming.SystemIsDark != _dark)
-            ApplyTheme();
-    }
-
-    protected override void ExitThreadCore()
-    {
+        if (_exited) return;
+        _exited = true;
         _settings.Changed -= OnSettingsChanged;
-        SystemEvents.SessionSwitch -= OnSessionSwitch;
-        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
-        // Disposing the form saves any pending excluded-apps edit.
-        _form?.Dispose();
+        // Destroying the window saves any pending excluded-apps edit.
+        _window?.Destroy();
+        _window = null;
         _remapper.Dispose();
-        _tray.Visible = false;
-        _tray.ContextMenuStrip?.Dispose();
-        _tray.Dispose();
-        base.ExitThreadCore();
+        _tray.Remove();
+        WTSUnRegisterSessionNotification(Handle);
+        DestroyWindow(Handle);
+        PostQuitMessage(0);
     }
 }

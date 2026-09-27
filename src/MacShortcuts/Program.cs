@@ -1,3 +1,4 @@
+using MacShortcuts.Interop;
 using MacShortcuts.UI;
 
 namespace MacShortcuts;
@@ -10,11 +11,14 @@ internal static class Program
         using var instance = SingleInstance.TryAcquire(waitForPrevious: args.Contains(CommandLineArgs.WaitForPrevious));
         if (instance == null) return;
 
-        ApplicationConfiguration.Initialize();
-        var sync = new WindowsFormsSynchronizationContext();
-        var app = new TrayApp(startMinimized: args.Contains(CommandLineArgs.Minimized));
-        instance.OnShowRequested(() => sync.Post(_ => app.ShowSettings(), null));
+        ComCtl32.InitCommonControlsEx(new ComCtl32.INITCOMMONCONTROLSEX
+        {
+            dwSize = 8,
+            dwICC = ComCtl32.ICC_STANDARD_CLASSES | ComCtl32.ICC_LISTVIEW_CLASSES | ComCtl32.ICC_TAB_CLASSES,
+        });
 
-        Application.Run(app);
+        using var app = new TrayApp(startMinimized: args.Contains(CommandLineArgs.Minimized));
+        instance.OnShowRequested(app.RequestShowSettings);
+        app.Run();
     }
 }

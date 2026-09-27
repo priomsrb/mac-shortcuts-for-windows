@@ -1,0 +1,38 @@
+namespace MacShortcuts.Shortcuts;
+
+/// <summary>Windows virtual-key codes used by the shortcut catalog (names match WinForms' Keys).</summary>
+public enum Keys
+{
+    Back = 0x08,
+    Tab = 0x09,
+    Space = 0x20,
+    PageUp = 0x21,
+    PageDown = 0x22,
+    End = 0x23,
+    Home = 0x24,
+    Left = 0x25,
+    Up = 0x26,
+    Right = 0x27,
+    Down = 0x28,
+    PrintScreen = 0x2C,
+    Insert = 0x2D,
+    Delete = 0x2E,
+    D0 = 0x30, D1, D2, D3, D4, D5, D6, D7, D8, D9,
+    A = 0x41, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+    Apps = 0x5D,
+    Add = 0x6B,
+    Subtract = 0x6D,
+    Divide = 0x6F,
+    F3 = 0x72,
+    F4 = 0x73,
+    NumLock = 0x90,
+    BrowserBack = 0xA6,
+    BrowserForward = 0xA7,
+    LaunchApplication2 = 0xB7,
+    Oemplus = 0xBB,
+    Oemcomma = 0xBC,
+    OemMinus = 0xBD,
+    OemQuestion = 0xBF,
+    OemOpenBrackets = 0xDB,
+    OemCloseBrackets = 0xDD,
+}
