@@ -23,6 +23,7 @@ dotnet publish src/MacShortcuts -c Release -r win-x64 --self-contained -p:Publis
 - Left-click the tray icon to open settings; right-click for **Enabled** / **Exit**.
 - Closing the settings window keeps the app running in the tray.
 - **Start with Windows** launches it minimized at sign-in.
+- **Theme**: System (follows Windows' light/dark app mode, including live changes), Light or Dark.
 - **Excluded apps**: process names (e.g. `mstsc.exe`) where nothing is remapped.
 - Settings are stored in `%APPDATA%\MacShortcuts\settings.json`.
 

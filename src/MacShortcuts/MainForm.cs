@@ -7,7 +7,8 @@ internal sealed class MainForm : Form
     readonly CheckBox _leftAlt;
     readonly CheckBox _rightAlt;
     readonly CheckBox _startup;
-    readonly ListView _list;
+    readonly ComboBox _theme;
+    readonly ThemedListView _list;
     readonly TextBox _excluded;
     readonly System.Windows.Forms.Timer _excludedSaveTimer = new() { Interval = 600 };
     bool _loading;
@@ -46,9 +47,12 @@ internal sealed class MainForm : Form
         _rightAlt = MakeCheckBox("Right Alt acts as ⌘ Cmd");
         tips.SetToolTip(_rightAlt, "On keyboard layouts with AltGr, this replaces AltGr+key characters (e.g. €).");
         _startup = MakeCheckBox("Start with Windows");
+        _theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = LogicalToDeviceUnits(80), Margin = new Padding(4, 2, 20, 0) };
+        _theme.Items.AddRange(Enum.GetNames<AppTheme>());
 
         var options = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 8) };
-        options.Controls.AddRange([_enabled, _leftAlt, _rightAlt, _startup]);
+        options.Controls.AddRange([_enabled, _leftAlt, _rightAlt, _startup,
+            new Label { Text = "Theme:", AutoSize = true, Margin = new Padding(0, 6, 0, 0) }, _theme]);
 
         if (Elevation.IsAdmin)
         {
@@ -57,6 +61,7 @@ internal sealed class MainForm : Form
         else
         {
             var adminLink = new LinkLabel { Text = "Restart as administrator", AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
+            if (Application.IsDarkModeEnabled) adminLink.LinkColor = adminLink.ActiveLinkColor = Theming.DarkAccentText;
             tips.SetToolTip(adminLink, "Needed for shortcuts to work while an admin app (Task Manager, admin terminal…) is focused.");
             adminLink.LinkClicked += (_, _) => _app.RestartAsAdmin();
             options.Controls.Add(adminLink);
@@ -64,7 +69,7 @@ internal sealed class MainForm : Form
         root.Controls.Add(options);
 
         // Shortcut list
-        _list = new ListView
+        _list = new ThemedListView
         {
             Dock = DockStyle.Fill,
             View = View.Details,
@@ -88,11 +93,12 @@ internal sealed class MainForm : Form
             }
             _list.Items.Add(new ListViewItem([shortcut.Trigger, shortcut.Sends, shortcut.Description], group) { Tag = shortcut });
         }
+        if (Application.IsDarkModeEnabled) _list.UseDarkCheckBoxes();
         _list.ItemChecked += OnItemChecked;
         root.Controls.Add(_list);
 
         // Excluded apps
-        var excludedBox = new GroupBox
+        var excludedBox = new ThemedGroupBox
         {
             Text = "Excluded apps",
             Dock = DockStyle.Fill,
@@ -101,6 +107,8 @@ internal sealed class MainForm : Form
             Padding = new Padding(8),
         };
         _excluded = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
+        // The default 3D border is near-white in dark mode; the single-line one is a subtle grey.
+        if (Application.IsDarkModeEnabled) _excluded.BorderStyle = BorderStyle.FixedSingle;
         excludedBox.Controls.Add(_excluded);
         excludedBox.Controls.Add(new Label
         {
@@ -139,6 +147,8 @@ internal sealed class MainForm : Form
         _leftAlt.CheckedChanged += (_, _) => { if (!_loading) { Settings.UseLeftAlt = _leftAlt.Checked; _app.ApplySettings(); } };
         _rightAlt.CheckedChanged += (_, _) => { if (!_loading) { Settings.UseRightAlt = _rightAlt.Checked; _app.ApplySettings(); } };
         _startup.CheckedChanged += (_, _) => { if (!_loading) SetStartup(_startup.Checked); };
+        // Deferred: applying a theme recreates this window.
+        _theme.SelectedIndexChanged += (_, _) => { if (!_loading) BeginInvoke(() => _app.SetTheme((AppTheme)_theme.SelectedIndex)); };
     }
 
     /// <summary>Called by the tray when "Enabled" is toggled there.</summary>
@@ -161,6 +171,17 @@ internal sealed class MainForm : Form
         base.OnFormClosing(e);
     }
 
+    protected override void Dispose(bool disposing)
+    {
+        // The window is disposed without closing when the theme changes or the app exits.
+        if (disposing)
+        {
+            SaveExcluded();
+            _excludedSaveTimer.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
@@ -174,6 +195,7 @@ internal sealed class MainForm : Form
         _leftAlt.Checked = Settings.UseLeftAlt;
         _rightAlt.Checked = Settings.UseRightAlt;
         _startup.Checked = StartWithWindows.IsEnabled;
+        _theme.SelectedIndex = (int)Settings.Theme;
         foreach (ListViewItem item in _list.Items)
             item.Checked = Settings.IsEnabled((ShortcutDef)item.Tag!);
         _excluded.Text = string.Join(Environment.NewLine, Settings.ExcludedApps);

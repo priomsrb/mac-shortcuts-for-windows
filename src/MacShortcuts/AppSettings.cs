@@ -1,6 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MacShortcuts;
+
+[JsonConverter(typeof(JsonStringEnumConverter<AppTheme>))]
+public enum AppTheme { System, Light, Dark }
 
 public sealed class AppSettings
 {
@@ -12,6 +16,7 @@ public sealed class AppSettings
     public bool Enabled { get; set; } = true;
     public bool UseLeftAlt { get; set; } = true;
     public bool UseRightAlt { get; set; } = true;
+    public AppTheme Theme { get; set; } = AppTheme.System;
 
     /// <summary>Only shortcuts the user has toggled are stored; the rest use their defaults.</summary>
     public Dictionary<string, bool> Shortcuts { get; set; } = [];
