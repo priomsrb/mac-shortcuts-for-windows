@@ -15,4 +15,8 @@
     <Product>Mac Shortcuts for Windows</Product>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MacShortcuts.Tests" />
+  </ItemGroup>
+
 </Project>
