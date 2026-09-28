@@ -14,7 +14,7 @@ internal static class Program
         ComCtl32.InitCommonControlsEx(new ComCtl32.INITCOMMONCONTROLSEX
         {
             dwSize = 8,
-            dwICC = ComCtl32.ICC_STANDARD_CLASSES | ComCtl32.ICC_LISTVIEW_CLASSES | ComCtl32.ICC_TAB_CLASSES,
+            dwICC = ComCtl32.ICC_STANDARD_CLASSES | ComCtl32.ICC_LISTVIEW_CLASSES,
         });
 
         using var app = new TrayApp(startMinimized: args.Contains(CommandLineArgs.Minimized));

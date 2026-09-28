@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using MacShortcuts.Interop;
 using MacShortcuts.Platform;
 using MacShortcuts.Remapping;
 using MacShortcuts.Settings;
@@ -12,13 +13,13 @@ namespace MacShortcuts.UI;
 /// Owns the tray icon, the settings window and the remapper for the app's lifetime, through a
 /// hidden top-level window (it must be top-level to receive broadcasts like WM_SETTINGCHANGE).
 /// </summary>
-internal sealed class TrayApp : Window, IDisposable
+internal sealed unsafe class TrayApp : Window, IDisposable
 {
     const int WM_TRAY = WM_APP + 1;
     const int WM_SHOW_SETTINGS = WM_APP + 2;
     const int WM_QUERYENDSESSION = 0x0011;
     const int WM_ENDSESSION = 0x0016;
-    const int MenuSettings = 1, MenuEnabled = 2, MenuExit = 3;
+    const int MenuSettings = 1, MenuEnabled = 2, MenuRestartAsAdmin = 3, MenuExit = 4;
 
     static readonly uint TaskbarCreated = RegisterWindowMessage("TaskbarCreated");
 
@@ -142,19 +143,31 @@ internal sealed class TrayApp : Window, IDisposable
         if (_window == null) return;
         bool visible = _window.IsVisible;
         var placement = _window.Placement;
+        var page = _window.CurrentPage;
         _window.Destroy();
         _window = null;
         if (!visible) return;
 
-        _window = CreateWindow(placement);
+        _window = CreateWindow(placement, page);
         _window.Show();
     }
 
     void ShowMenu(int x, int y)
     {
         IntPtr menu = CreatePopupMenu();
-        AppendMenu(menu, MF_STRING, MenuSettings, "Settings…");
+        // The default item (bold) is what clicking the icon does.
+        AppendMenu(menu, MF_STRING, MenuSettings, "Settings");
+        SetMenuDefaultItem(menu, MenuSettings, 0);
+        AppendMenu(menu, MF_SEPARATOR, 0, null);
         AppendMenu(menu, MF_STRING | (_settings.Enabled ? MF_CHECKED : 0), MenuEnabled, "Enabled");
+        IntPtr shield = IntPtr.Zero;
+        if (!Elevation.IsAdmin)
+        {
+            AppendMenu(menu, MF_STRING, MenuRestartAsAdmin, "Restart as administrator");
+            shield = AppIcons.CreateShieldBitmap(GetDpiForWindow(Handle));
+            if (shield != IntPtr.Zero)
+                SetMenuItemInfo(menu, MenuRestartAsAdmin, false, new MENUITEMINFOW { cbSize = (uint)sizeof(MENUITEMINFOW), fMask = MIIM_BITMAP, hbmpItem = shield });
+        }
         AppendMenu(menu, MF_SEPARATOR, 0, null);
         AppendMenu(menu, MF_STRING, MenuExit, "Exit");
 
@@ -163,24 +176,28 @@ internal sealed class TrayApp : Window, IDisposable
         int command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, x, y, Handle, IntPtr.Zero);
         PostMessage(Handle, WM_NULL, IntPtr.Zero, IntPtr.Zero);
         DestroyMenu(menu);
+        if (shield != IntPtr.Zero) Gdi32.DeleteObject(shield);
 
         switch (command)
         {
             case MenuSettings: ShowSettings(); break;
             case MenuEnabled: _settings.SetEnabled(!_settings.Enabled); break;
+            case MenuRestartAsAdmin: RestartAsAdmin(); break;
             case MenuExit: Exit(); break;
         }
     }
 
-    MainWindow CreateWindow(WINDOWPLACEMENT? placement)
+    MainWindow CreateWindow(WINDOWPLACEMENT? placement, MainWindow.Page page = MainWindow.Page.Shortcuts)
     {
-        var window = new MainWindow(_settings, _dark, placement);
+        var window = new MainWindow(_settings, _dark, placement, page);
         window.HiddenToTray += (_, _) => ShowTrayHint();
-        window.RestartAsAdminRequested += (_, _) =>
-        {
-            if (Elevation.TryRestartElevated()) Exit();
-        };
+        window.RestartAsAdminRequested += (_, _) => RestartAsAdmin();
         return window;
+    }
+
+    void RestartAsAdmin()
+    {
+        if (Elevation.TryRestartElevated()) Exit();
     }
 
     void SaveSettings(AppSettings settings)

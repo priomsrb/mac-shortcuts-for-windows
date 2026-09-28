@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using MacShortcuts.Interop;
+using MacShortcuts.UI.Drawing;
 using static MacShortcuts.Interop.ComCtl32;
 using static MacShortcuts.Interop.Gdi32;
 using static MacShortcuts.Interop.User32;
@@ -7,38 +8,51 @@ using static MacShortcuts.Interop.User32;
 namespace MacShortcuts.UI.Controls;
 
 /// <summary>
-/// A report-view ListView with checkboxes and groups. In dark mode it paints its own group headers
-/// (the native control draws them in dark blue regardless of theme) and uses dark checkboxes.
+/// A report-view ListView. Its column headers, group headers and checkboxes are drawn in the
+/// window's palette; the owner draws the rows through NM_CUSTOMDRAW.
 /// </summary>
 internal sealed unsafe class ListView
 {
-    public IntPtr Handle { get; }
+    readonly List<string> _columns = [];
+    Palette? _palette;
+    IntPtr _headerFont;
+    int _dpi = 96;
 
-    public ListView(IntPtr parent, uint exStyle)
+    /// <param name="checkBoxes">A checkbox on each row.</param>
+    /// <param name="header">Column headers; without them the list is a plain list of rows.</param>
+    public ListView(IntPtr parent, bool checkBoxes, bool header)
     {
-        Handle = CreateWindowEx(exStyle, "SysListView32", null,
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER,
+        Handle = CreateWindowEx(0, "SysListView32", null,
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER
+                | (header ? 0 : LVS_NOCOLUMNHEADER),
             0, 0, 0, 0, parent, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
-        const int exStyles = LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER;
+        int exStyles = LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | (checkBoxes ? LVS_EX_CHECKBOXES : 0);
         SendMessage(Handle, LVM_SETEXTENDEDLISTVIEWSTYLE, exStyles, exStyles);
-        SendMessage(Handle, LVM_ENABLEGROUPVIEW, 1, IntPtr.Zero);
+
+        // Draws the column headers, which report their drawing to the ListView (their parent).
+        var self = GCHandle.Alloc(this);
+        SetWindowSubclass(Handle, &Subclass, 1, (nuint)GCHandle.ToIntPtr(self));
     }
+
+    public IntPtr Handle { get; }
 
     public IntPtr Header => SendMessage(Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
 
     public int Count => (int)SendMessage(Handle, LVM_GETITEMCOUNT, IntPtr.Zero, IntPtr.Zero);
 
+    /// <summary>The selected row, or -1.</summary>
+    public int SelectedIndex => (int)SendMessage(Handle, LVM_GETNEXTITEM, -1, LVNI_SELECTED);
+
     public void AddColumn(string text, int width)
     {
-        int index = ColumnCount++;
+        int index = _columns.Count;
+        _columns.Add(text);
         fixed (char* p = text)
         {
             var column = new LVCOLUMNW { mask = LVCF_TEXT | LVCF_WIDTH, cx = width, pszText = (IntPtr)p };
             SendMessage(Handle, LVM_INSERTCOLUMNW, index, (IntPtr)(&column));
         }
     }
-
-    public int ColumnCount { get; private set; }
 
     public int GetColumnWidth(int index) => (int)SendMessage(Handle, LVM_GETCOLUMNWIDTH, index, IntPtr.Zero);
 
@@ -59,6 +73,11 @@ internal sealed unsafe class ListView
         }
     }
 
+    public void EnableGroups(bool enable) => SendMessage(Handle, LVM_ENABLEGROUPVIEW, enable ? 1 : 0, IntPtr.Zero);
+
+    public void Clear() => SendMessage(Handle, LVM_DELETEALLITEMS, IntPtr.Zero, IntPtr.Zero);
+
+    /// <param name="groupId">The group added with <see cref="AddGroup"/>, or 0 for none.</param>
     /// <returns>The item's index; items keep the order they were added in.</returns>
     public int AddItem(int groupId, params ReadOnlySpan<string> columns)
     {
@@ -67,7 +86,8 @@ internal sealed unsafe class ListView
         {
             var item = new LVITEMW
             {
-                mask = LVIF_TEXT | LVIF_GROUPID,
+                // Inserting fails with a group that doesn't exist.
+                mask = LVIF_TEXT | (groupId > 0 ? LVIF_GROUPID : 0),
                 iItem = Count,
                 pszText = (IntPtr)p,
                 iGroupId = groupId,
@@ -85,6 +105,27 @@ internal sealed unsafe class ListView
         return index;
     }
 
+    public void Select(int index)
+    {
+        const uint LVIS_FOCUSED = 0x1, LVIS_SELECTED = 0x2;
+        var item = new LVITEMW { stateMask = LVIS_FOCUSED | LVIS_SELECTED, state = LVIS_FOCUSED | LVIS_SELECTED };
+        SendMessage(Handle, LVM_SETITEMSTATE, index, (IntPtr)(&item));
+    }
+
+    public RECT GetItemRect(int index, int part = LVIR_BOUNDS)
+    {
+        var rect = new RECT { left = part };
+        SendMessage(Handle, LVM_GETITEMRECT, index, (IntPtr)(&rect));
+        return rect;
+    }
+
+    /// <summary>Whether a row is selected. Custom draw's CDIS_SELECTED isn't reliable for this.</summary>
+    public bool IsSelected(int index)
+    {
+        const uint LVIS_SELECTED = 0x2;
+        return ((uint)SendMessage(Handle, LVM_GETITEMSTATE, index, (IntPtr)LVIS_SELECTED) & LVIS_SELECTED) != 0;
+    }
+
     public bool IsChecked(int index) =>
         ((uint)SendMessage(Handle, LVM_GETITEMSTATE, index, (IntPtr)LVIS_STATEIMAGEMASK) & LVIS_STATEIMAGEMASK) == CheckState(true);
 
@@ -100,11 +141,23 @@ internal sealed unsafe class ListView
         && (change->uOldState & LVIS_STATEIMAGEMASK) != 0 // 0 = the item was just added
         && ((change->uNewState ^ change->uOldState) & LVIS_STATEIMAGEMASK) != 0;
 
-    public void SetColors(uint back, uint text)
+    /// <summary>Colours the list, its headers and checkboxes. Call again after the DPI changes.</summary>
+    public void ApplyStyle(Palette palette, IntPtr font, IntPtr headerFont, int rowHeight, int dpi)
     {
-        SendMessage(Handle, LVM_SETBKCOLOR, IntPtr.Zero, (IntPtr)back);
-        SendMessage(Handle, LVM_SETTEXTBKCOLOR, IntPtr.Zero, (IntPtr)back);
-        SendMessage(Handle, LVM_SETTEXTCOLOR, IntPtr.Zero, (IntPtr)text);
+        _palette = palette;
+        _headerFont = headerFont;
+        _dpi = dpi;
+        SendMessage(Handle, WM_SETFONT, font, 1);
+        SendMessage(Handle, LVM_SETBKCOLOR, IntPtr.Zero, (IntPtr)palette.Surface);
+        SendMessage(Handle, LVM_SETTEXTBKCOLOR, IntPtr.Zero, (IntPtr)palette.Surface);
+        SendMessage(Handle, LVM_SETTEXTCOLOR, IntPtr.Zero, (IntPtr)palette.Text);
+
+        // Rows are as tall as the tallest image, so a 1-pixel-wide image sets their height.
+        // The list destroys the image list it has when it's destroyed, but not one it's replacing.
+        IntPtr old = SendMessage(Handle, LVM_SETIMAGELIST, LVSIL_SMALL, ImageList_Create(1, rowHeight, ILC_COLOR32, 1, 0));
+        if (old != IntPtr.Zero) ImageList_Destroy(old);
+
+        DrawCheckBoxes();
     }
 
     /// <summary>
@@ -115,85 +168,42 @@ internal sealed unsafe class ListView
     {
         SendMessage(Handle, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, 0);
         SendMessage(Handle, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES);
+        DrawCheckBoxes();
     }
 
     /// <summary>
-    /// The native checkboxes keep the light theme in dark mode. Redraw them from the dark theme
-    /// so they match the other checkboxes. The control owns its checkbox image list (and empties
-    /// any list it's given instead), so the glyphs are overwritten in place.
+    /// Replaces the native checkbox glyphs with the window's. The control owns its checkbox image
+    /// list (and empties any list it's given instead), so the glyphs are overwritten in place.
     /// </summary>
-    public void UseDarkCheckBoxes(int dpi)
+    public void DrawCheckBoxes()
     {
         IntPtr images = SendMessage(Handle, LVM_GETIMAGELIST, LVSIL_STATE, IntPtr.Zero);
-        if (images != IntPtr.Zero && DarkCheckBoxes.Draw(images, dpi)) InvalidateRect(Handle, IntPtr.Zero, true);
-    }
-
-    /// <summary>
-    /// The dark header theme keeps the light theme's black text. The header reports its drawing to
-    /// the ListView (its parent), so intercept that to set the text colour.
-    /// </summary>
-    public void UseHeaderTextColor(uint color) =>
-        SetWindowSubclass(Handle, &HeaderColorSubclass, 1, color);
-
-    [UnmanagedCallersOnly]
-    static IntPtr HeaderColorSubclass(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam, nuint id, nuint color)
-    {
-        if (msg == WM_NOTIFY && ((NMHDR*)lParam)->code == NM_CUSTOMDRAW)
+        if (images == IntPtr.Zero || _palette is not { } palette) return;
+        ImageList_GetIconSize(images, out int width, out int height);
+        float size = MathF.Min(16f * _dpi / 96, MathF.Min(width, height));
+        for (int i = 0; i < 2; i++)
         {
-            var cd = (NMCUSTOMDRAW*)lParam;
-            if (cd->hdr.hwndFrom == SendMessage(hwnd, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero))
-            {
-                if (cd->dwDrawStage == CDDS_PREPAINT) return CDRF_NOTIFYITEMDRAW;
-                if (cd->dwDrawStage == CDDS_ITEMPREPAINT)
-                {
-                    _ = SetTextColor(cd->hdc, (uint)color);
-                    return CDRF_DODEFAULT;
-                }
-            }
+            bool isChecked = i == 1;
+            IntPtr bitmap = Canvas.RenderBitmap(width, height,
+                c => Glyphs.CheckBox(c, (width - size) / 2, (height - size) / 2, size, isChecked, palette));
+            ImageList_Replace(images, i, bitmap, IntPtr.Zero);
+            DeleteObject(bitmap);
         }
-        return DefSubclassProc(hwnd, msg, wParam, lParam);
+        InvalidateRect(Handle, IntPtr.Zero, true);
     }
 
-    /// <summary>Handles NM_CUSTOMDRAW in dark mode, painting the group headers.</summary>
-    public IntPtr CustomDraw(NMLVCUSTOMDRAW* cd, Palette palette, int dpi)
+    /// <summary>Paints a group header: its title, then a line to the right edge.</summary>
+    public void DrawGroupHeader(IntPtr hdc, int groupId, RECT bounds, Palette palette, IntPtr font)
     {
-        if (cd->nmcd.dwDrawStage != CDDS_PREPAINT) return CDRF_DODEFAULT;
-        if (cd->dwItemType != LVCDI_GROUP) return CDRF_NOTIFYITEMDRAW;
-        DrawGroupHeader(cd->nmcd.hdc, (int)cd->nmcd.dwItemSpec, cd->rcText, palette, dpi);
-        return CDRF_SKIPDEFAULT;
-    }
+        int Scale(int value) => value * _dpi / 96;
 
-    void DrawGroupHeader(IntPtr hdc, int groupId, RECT bounds, Palette palette, int dpi)
-    {
-        int Scale(int value) => value * dpi / 96;
-
-        IntPtr back = CreateSolidBrush(palette.Control);
-        FillRect(hdc, bounds, back);
-        DeleteObject(back);
-
-        const int WM_GETFONT = 0x0031;
-        IntPtr oldFont = SelectObject(hdc, SendMessage(Handle, WM_GETFONT, IntPtr.Zero, IntPtr.Zero));
+        Paint.Fill(hdc, bounds, palette.Surface);
         string text = GetGroupHeader(groupId);
-        var textRect = bounds with { left = bounds.left + Scale(6) };
-        DrawText(hdc, text, text.Length, ref textRect, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
-        textRect.top = bounds.top;
-        textRect.bottom = bounds.bottom;
-        _ = SetBkMode(hdc, TRANSPARENT);
-        _ = SetTextColor(hdc, palette.Accent);
-        DrawText(hdc, text, text.Length, ref textRect, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-        SelectObject(hdc, oldFont);
-
-        int lineX = textRect.right + Scale(6);
+        var textRect = bounds with { left = bounds.left + Scale(12) };
+        Paint.Text(hdc, text, font, palette.Text, textRect);
+        int lineX = textRect.left + Paint.Measure(text, font).cx + Scale(10);
         int lineY = bounds.top + (bounds.bottom - bounds.top) / 2;
-        if (lineX < bounds.right)
-        {
-            IntPtr pen = CreatePen(PS_SOLID, 1, palette.Border);
-            IntPtr oldPen = SelectObject(hdc, pen);
-            MoveToEx(hdc, lineX, lineY, IntPtr.Zero);
-            LineTo(hdc, bounds.right - Scale(8), lineY);
-            SelectObject(hdc, oldPen);
-            DeleteObject(pen);
-        }
+        if (lineX < bounds.right - Scale(12)) Paint.HorizontalLine(hdc, lineX, bounds.right - Scale(12), lineY, palette.Divider);
     }
 
     string GetGroupHeader(int groupId)
@@ -209,5 +219,53 @@ internal sealed unsafe class ListView
         };
         if (SendMessage(Handle, LVM_GETGROUPINFO, groupId, (IntPtr)(&group)) == -1) return "";
         return new string(buffer);
+    }
+
+    IntPtr DrawHeader(NMCUSTOMDRAW* cd)
+    {
+        if (_palette is not { } palette) return CDRF_DODEFAULT;
+        int Scale(int value) => value * _dpi / 96;
+
+        switch (cd->dwDrawStage)
+        {
+            case CDDS_PREPAINT:
+                Paint.Fill(cd->hdc, cd->rc, palette.SurfaceAlt);
+                return CDRF_NOTIFYITEMDRAW | CDRF_NOTIFYPOSTPAINT;
+
+            case CDDS_ITEMPREPAINT:
+                int column = (int)cd->dwItemSpec;
+                Paint.Fill(cd->hdc, cd->rc, palette.SurfaceAlt);
+                // Line the first column's title up with its text, after the checkbox.
+                int indent = column == 0 && Count > 0 ? GetItemRect(0, LVIR_LABEL).left : 0;
+                var textRect = cd->rc with { left = cd->rc.left + indent + Scale(6), right = cd->rc.right - Scale(4) };
+                if (column < _columns.Count)
+                    Paint.Text(cd->hdc, _columns[column], _headerFont, palette.MutedText, textRect,
+                        DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                return CDRF_SKIPDEFAULT;
+
+            case CDDS_POSTPAINT:
+                GetClientRect(cd->hdr.hwndFrom, out var client);
+                Paint.HorizontalLine(cd->hdc, client.left, client.right, client.bottom - 1, palette.Border);
+                return CDRF_DODEFAULT;
+        }
+        return CDRF_DODEFAULT;
+    }
+
+    [UnmanagedCallersOnly]
+    static IntPtr Subclass(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam, nuint id, nuint self)
+    {
+        var handle = GCHandle.FromIntPtr((IntPtr)self);
+        var list = (ListView)handle.Target!;
+        switch (msg)
+        {
+            case WM_NOTIFY when ((NMHDR*)lParam)->code == NM_CUSTOMDRAW
+                                && ((NMHDR*)lParam)->hwndFrom == SendMessage(hwnd, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero):
+                return list.DrawHeader((NMCUSTOMDRAW*)lParam);
+
+            case WM_NCDESTROY:
+                handle.Free();
+                break;
+        }
+        return DefSubclassProc(hwnd, msg, wParam, lParam);
     }
 }

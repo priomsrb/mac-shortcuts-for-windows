@@ -7,8 +7,11 @@ namespace MacShortcuts.Settings;
 
 public sealed class AppSettings
 {
-    static readonly string DefaultPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MacShortcuts", "settings.json");
+    /// <summary>The folder the settings file is saved in.</summary>
+    public static string Folder { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MacShortcuts");
+
+    static readonly string DefaultPath = Path.Combine(Folder, "settings.json");
 
     public bool Enabled { get; set; } = true;
     public bool UseLeftAlt { get; set; } = true;

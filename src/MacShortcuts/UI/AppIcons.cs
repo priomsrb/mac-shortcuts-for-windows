@@ -15,6 +15,25 @@ internal static unsafe class AppIcons
     public static IntPtr Large { get; } = Load(LIM_LARGE);
     public static IntPtr SmallDisabled { get; } = CreateDisabled(Small);
 
+    /// <summary>The UAC shield as a 32-bit bitmap for a menu item, or zero. The caller deletes it.</summary>
+    public static IntPtr CreateShieldBitmap(uint dpi)
+    {
+        const int IDI_SHIELD = 32518, SM_CXSMICON = 49;
+        int size = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+        if (LoadIconWithScaleDown(IntPtr.Zero, IDI_SHIELD, size, size, out IntPtr icon) < 0) return IntPtr.Zero;
+
+        // Menus take premultiplied alpha, which DrawIconEx produces on a zeroed 32-bit bitmap.
+        var header = new BITMAPINFOHEADER { biSize = sizeof(BITMAPINFOHEADER), biWidth = size, biHeight = -size, biPlanes = 1, biBitCount = 32 };
+        IntPtr bitmap = CreateDIBSection(IntPtr.Zero, ref header, 0, out _, IntPtr.Zero, 0);
+        IntPtr dc = CreateCompatibleDC(IntPtr.Zero);
+        IntPtr old = SelectObject(dc, bitmap);
+        DrawIconEx(dc, 0, 0, icon, size, size, 0, IntPtr.Zero, DI_NORMAL);
+        SelectObject(dc, old);
+        DeleteDC(dc);
+        DestroyIcon(icon);
+        return bitmap;
+    }
+
     static IntPtr Load(int metric)
     {
         if (LoadIconMetric(GetModuleHandle(null), AppIconId, metric, out IntPtr icon) >= 0) return icon;

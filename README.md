@@ -22,11 +22,12 @@ This uses [Native AOT](https://learn.microsoft.com/dotnet/core/deploying/native-
 
 ## Usage
 
-- Left-click the tray icon to open settings; right-click for **Enabled** / **Exit**.
-- Closing the settings window keeps the app running in the tray.
-- **Start with Windows** launches it minimized at sign-in.
-- **Theme**: System (follows Windows' light/dark app mode, including live changes), Light or Dark.
-- **Excluded apps**: process names (e.g. `mstsc.exe`) where nothing is remapped.
+- Left-click the tray icon to open the window; right-click for **Settings**, **Enabled**, **Restart as administrator** and **Exit**.
+- The window's rail switches between three pages, with an on/off switch for all remapping at the bottom:
+  - **Shortcuts**: every shortcut by category, with a filter box. Tick or untick each one.
+  - **Excluded apps**: apps where nothing is remapped (e.g. `mstsc.exe`). Type a process name, pick a running app or browse for an `.exe`.
+  - **Settings**: Start with Windows (launches minimized at sign-in), which Alt keys act as ⌘ Cmd, the theme (System follows Windows' light/dark app mode, including live changes) and restarting as administrator.
+- Closing the window keeps the app running in the tray.
 - Settings are stored in `%APPDATA%\MacShortcuts\settings.json`.
 
 ## Notes

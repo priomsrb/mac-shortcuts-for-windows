@@ -19,7 +19,10 @@ internal static unsafe partial class User32
     public const int WM_ERASEBKGND = 0x0014;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_GETMINMAXINFO = 0x0024;
+    public const int WM_SETREDRAW = 0x000B;
     public const int WM_SETFONT = 0x0030;
+    public const int WM_DRAWITEM = 0x002B;
+    public const int WM_MEASUREITEM = 0x002C;
     public const int WM_NOTIFY = 0x004E;
     public const int WM_CONTEXTMENU = 0x007B;
     public const int WM_SETICON = 0x0080;
@@ -73,10 +76,27 @@ internal static unsafe partial class User32
     public const int CB_SETCURSEL = 0x014E;
     public const int CBN_SELCHANGE = 1;
 
-    public const uint ES_MULTILINE = 0x0004;
-    public const uint ES_AUTOVSCROLL = 0x0040;
-    public const uint ES_WANTRETURN = 0x1000;
+    public const uint ES_AUTOHSCROLL = 0x0080;
     public const int EN_CHANGE = 0x0300;
+    public const int EM_SETCUEBANNER = 0x1501;
+
+    public const uint LBS_NOTIFY = 0x1;
+    public const uint LBS_OWNERDRAWFIXED = 0x10;
+    public const uint LBS_HASSTRINGS = 0x40;
+    public const uint LBS_NOINTEGRALHEIGHT = 0x100;
+    public const int LB_ADDSTRING = 0x0180;
+    public const int LB_SETCURSEL = 0x0186;
+    public const int LB_GETCURSEL = 0x0188;
+    public const int LB_SETITEMHEIGHT = 0x01A0;
+    public const int LBN_SELCHANGE = 1;
+
+    public const uint ODS_SELECTED = 0x1;
+    public const uint ODS_FOCUS = 0x10;
+    public const uint ODS_NOFOCUSRECT = 0x200;
+
+    public const int IDOK = 1;
+    public const int IDCANCEL = 2;
+    public const int VK_DELETE = 0x2E;
 
     public const int SW_HIDE = 0;
     public const int SW_SHOWNORMAL = 1;
@@ -98,14 +118,23 @@ internal static unsafe partial class User32
     public const uint MONITOR_DEFAULTTONEAREST = 2;
 
     public const uint DT_LEFT = 0x0;
+    public const uint DT_CENTER = 0x1;
+    public const uint DT_RIGHT = 0x2;
     public const uint DT_VCENTER = 0x4;
+    public const uint DT_BOTTOM = 0x8;
+    public const uint DT_WORDBREAK = 0x10;
     public const uint DT_SINGLELINE = 0x20;
     public const uint DT_NOPREFIX = 0x800;
     public const uint DT_CALCRECT = 0x400;
+    public const uint DT_END_ELLIPSIS = 0x8000;
+
+    public const uint DI_NORMAL = 0x3;
 
     public const uint MF_STRING = 0x0;
+    public const uint MF_GRAYED = 0x1;
     public const uint MF_CHECKED = 0x8;
     public const uint MF_SEPARATOR = 0x800;
+    public const uint MIIM_BITMAP = 0x80;
     public const uint TPM_RIGHTBUTTON = 0x2;
     public const uint TPM_RETURNCMD = 0x100;
     public const uint TPM_NONOTIFY = 0x80;
@@ -275,6 +304,48 @@ internal static unsafe partial class User32
         public IntPtr hbmColor;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DRAWITEMSTRUCT
+    {
+        public uint CtlType;
+        public uint CtlID;
+        public int itemID;
+        public uint itemAction;
+        public uint itemState;
+        public IntPtr hwndItem;
+        public IntPtr hDC;
+        public RECT rcItem;
+        public nuint itemData;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MEASUREITEMSTRUCT
+    {
+        public uint CtlType;
+        public uint CtlID;
+        public uint itemID;
+        public uint itemWidth;
+        public uint itemHeight;
+        public nuint itemData;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MENUITEMINFOW
+    {
+        public uint cbSize;
+        public uint fMask;
+        public uint fType;
+        public uint fState;
+        public uint wID;
+        public IntPtr hSubMenu;
+        public IntPtr hbmpChecked;
+        public IntPtr hbmpUnchecked;
+        public nuint dwItemData;
+        public IntPtr dwTypeData;
+        public uint cch;
+        public IntPtr hbmpItem;
+    }
+
     public static int LoWord(IntPtr value) => (short)((long)value & 0xFFFF);
     public static int HiWord(IntPtr value) => (short)(((long)value >> 16) & 0xFFFF);
 
@@ -426,6 +497,24 @@ internal static unsafe partial class User32
     public static partial IntPtr SetFocus(IntPtr hWnd);
 
     [LibraryImport("user32.dll")]
+    public static partial IntPtr GetFocus();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsChild(IntPtr parent, IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+    [LibraryImport("user32.dll")]
+    public static partial int GetSystemMetricsForDpi(int index, uint dpi);
+
+    /// <summary>The system owns <paramref name="region"/> afterwards.</summary>
+    [LibraryImport("user32.dll")]
+    public static partial int SetWindowRgn(IntPtr hWnd, IntPtr region, [MarshalAs(UnmanagedType.Bool)] bool redraw);
+
+    [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool InvalidateRect(IntPtr hWnd, IntPtr rect, [MarshalAs(UnmanagedType.Bool)] bool erase);
 
@@ -486,6 +575,10 @@ internal static unsafe partial class User32
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool DestroyIcon(IntPtr icon);
 
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DrawIconEx(IntPtr hdc, int x, int y, IntPtr icon, int width, int height, uint step, IntPtr flickerFreeBrush, uint flags);
+
     // Menus
 
     [LibraryImport("user32.dll")]
@@ -497,6 +590,14 @@ internal static unsafe partial class User32
 
     [LibraryImport("user32.dll")]
     public static partial int TrackPopupMenuEx(IntPtr menu, uint flags, int x, int y, IntPtr hWnd, IntPtr tpm);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetMenuDefaultItem(IntPtr menu, uint item, uint byPosition);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetMenuItemInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetMenuItemInfo(IntPtr menu, uint item, [MarshalAs(UnmanagedType.Bool)] bool byPosition, in MENUITEMINFOW info);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

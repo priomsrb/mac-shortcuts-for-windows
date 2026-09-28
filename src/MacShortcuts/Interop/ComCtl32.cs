@@ -2,24 +2,31 @@ using System.Runtime.InteropServices;
 
 namespace MacShortcuts.Interop;
 
-/// <summary>Common controls: ListView, tooltips, custom draw and image lists.</summary>
+/// <summary>Common controls: ListView, custom draw and image lists.</summary>
 internal static partial class ComCtl32
 {
     public const uint ICC_LISTVIEW_CLASSES = 0x1;
-    public const uint ICC_TAB_CLASSES = 0x8; // includes tooltips
     public const uint ICC_STANDARD_CLASSES = 0x4000;
 
     public const int LIM_SMALL = 0;
     public const int LIM_LARGE = 1;
 
     // Custom draw
+    public const int NM_CLICK = -2;
     public const int NM_CUSTOMDRAW = -12;
     public const int CDDS_PREPAINT = 0x1;
+    public const int CDDS_POSTPAINT = 0x2;
     public const int CDDS_ITEM = 0x10000;
+    public const int CDDS_SUBITEM = 0x20000;
     public const int CDDS_ITEMPREPAINT = CDDS_ITEM | CDDS_PREPAINT;
+    public const int CDDS_ITEMPOSTPAINT = CDDS_ITEM | CDDS_POSTPAINT;
+    public const int CDDS_SUBITEMPREPAINT = CDDS_SUBITEM | CDDS_ITEMPREPAINT;
     public const int CDRF_DODEFAULT = 0x0;
+    public const int CDRF_NEWFONT = 0x2;
     public const int CDRF_SKIPDEFAULT = 0x4;
+    public const int CDRF_NOTIFYPOSTPAINT = 0x10;
     public const int CDRF_NOTIFYITEMDRAW = 0x20;
+    public const int CDRF_NOTIFYSUBITEMDRAW = 0x20;
     public const uint CDIS_SELECTED = 0x1;
     public const uint CDIS_DISABLED = 0x4;
     public const uint CDIS_FOCUS = 0x10;
@@ -31,6 +38,7 @@ internal static partial class ComCtl32
     public const uint LVS_SHOWSELALWAYS = 0x8;
     public const uint LVS_SINGLESEL = 0x4;
     public const uint LVS_NOSORTHEADER = 0x8000;
+    public const uint LVS_NOCOLUMNHEADER = 0x4000;
     public const int LVS_EX_CHECKBOXES = 0x4;
     public const int LVS_EX_FULLROWSELECT = 0x20;
     public const int LVS_EX_DOUBLEBUFFER = 0x10000;
@@ -38,6 +46,10 @@ internal static partial class ComCtl32
     public const int LVM_FIRST = 0x1000;
     public const int LVM_SETBKCOLOR = LVM_FIRST + 1;
     public const int LVM_GETIMAGELIST = LVM_FIRST + 2;
+    public const int LVM_SETIMAGELIST = LVM_FIRST + 3;
+    public const int LVM_DELETEALLITEMS = LVM_FIRST + 9;
+    public const int LVM_GETNEXTITEM = LVM_FIRST + 12;
+    public const int LVM_GETITEMRECT = LVM_FIRST + 14;
     public const int LVM_SETITEMSTATE = LVM_FIRST + 43;
     public const int LVM_GETITEMSTATE = LVM_FIRST + 44;
     public const int LVM_GETHEADER = LVM_FIRST + 31;
@@ -56,6 +68,16 @@ internal static partial class ComCtl32
 
     public const int LVN_FIRST = -100;
     public const int LVN_ITEMCHANGED = LVN_FIRST - 1;
+    public const int LVN_KEYDOWN = LVN_FIRST - 55;
+    public const int LVNI_SELECTED = 0x2;
+    public const int LVIR_BOUNDS = 0;
+    public const int LVIR_LABEL = 2;
+    public const int LVSIL_SMALL = 1;
+    public const uint ILC_COLOR32 = 0x20;
+
+    // Header
+    public const int HDM_GETITEMCOUNT = 0x1200;
+    public const int HDM_GETITEMRECT = 0x1200 + 7;
 
     public const uint LVIF_TEXT = 0x1;
     public const uint LVIF_STATE = 0x8;
@@ -69,14 +91,6 @@ internal static partial class ComCtl32
     public const uint LVGF_HEADER = 0x1;
     public const uint LVGF_GROUPID = 0x10;
     public const int LVSIL_STATE = 2;
-
-    // Tooltips
-    public const int TTM_ADDTOOLW = WM_USER + 50;
-    public const int TTM_SETMAXTIPWIDTH = WM_USER + 24;
-    public const uint TTS_ALWAYSTIP = 0x1;
-    public const uint TTS_NOPREFIX = 0x2;
-    public const uint TTF_IDISHWND = 0x1;
-    public const uint TTF_SUBCLASS = 0x10;
 
     const int WM_USER = 0x0400;
 
@@ -138,6 +152,28 @@ internal static partial class ComCtl32
         public uint uChanged;
         public POINT ptAction;
         public IntPtr lParam;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NMITEMACTIVATE
+    {
+        public NMHDR hdr;
+        public int iItem;
+        public int iSubItem;
+        public uint uNewState;
+        public uint uOldState;
+        public uint uChanged;
+        public POINT ptAction;
+        public IntPtr lParam;
+        public uint uKeyFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct NMLVKEYDOWN
+    {
+        public NMHDR hdr;
+        public ushort wVKey;
+        public uint flags;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -205,20 +241,6 @@ internal static partial class ComCtl32
         public uint cchSubsetTitle;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct TOOLINFOW
-    {
-        public uint cbSize;
-        public uint uFlags;
-        public IntPtr hwnd;
-        public nuint uId;
-        public RECT rect;
-        public IntPtr hinst;
-        public IntPtr lpszText;
-        public IntPtr lParam;
-        public IntPtr lpReserved;
-    }
-
     [LibraryImport("comctl32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool InitCommonControlsEx(in INITCOMMONCONTROLSEX init);
@@ -244,4 +266,11 @@ internal static partial class ComCtl32
     [LibraryImport("comctl32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool ImageList_Replace(IntPtr imageList, int index, IntPtr image, IntPtr mask);
+
+    [LibraryImport("comctl32.dll")]
+    public static partial IntPtr ImageList_Create(int cx, int cy, uint flags, int initial, int grow);
+
+    [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ImageList_Destroy(IntPtr imageList);
 }
