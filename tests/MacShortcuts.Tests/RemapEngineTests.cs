@@ -211,6 +211,41 @@ public class RemapEngineTests
     }
 
     [Fact]
+    public void AltClick_InAltTabSwitcher_PassesThrough()
+    {
+        Press(VK_LMENU);
+        Tap(Tab);
+        Assert.False(_engine.OnLeftButton(down: true, default));
+        Assert.False(_engine.OnLeftButton(down: false, default));
+        Assert.False(_engine.OnWheel(120, default));
+        AssertSent([]);
+    }
+
+    [Fact]
+    public void AltClick_AfterAltTabEnds_SendsCtrlClickAgain()
+    {
+        Press(VK_LMENU);
+        Tap(Tab);
+        Release(VK_LMENU);
+
+        Press(VK_LMENU);
+        Assert.True(_engine.OnLeftButton(down: true, default));
+        AssertSent([.. ReleasedAlt(VK_LMENU), KeyDown(VK_LCONTROL), new SyntheticInput.LeftButton(Up: false)]);
+    }
+
+    [Fact]
+    public void AltClick_InAltTabSwitcherAfterShortcut_PassesThrough()
+    {
+        Press(VK_LMENU);
+        Tap(C);
+        Tap(Tab); // Re-presses Alt, opening the switcher.
+        _system.Sent.Clear();
+
+        Assert.False(_engine.OnLeftButton(down: true, default));
+        AssertSent([]);
+    }
+
+    [Fact]
     public void PlainClick_PassesThrough()
     {
         Assert.False(_engine.OnLeftButton(down: true, default));

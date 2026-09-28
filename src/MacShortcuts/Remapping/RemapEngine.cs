@@ -34,6 +34,7 @@ internal sealed class RemapEngine(IInputSystem system)
     bool _lAltLogical, _rAltLogical; // what Windows currently thinks
     bool _lShift, _rShift, _lCtrl, _rCtrl, _lWin, _rWin;
     bool _ctrlClickActive;
+    bool _altTabActive;              // Alt+Tab switcher is (probably) open; leave clicks alone
     readonly HashSet<int> _swallowedKeyUps = [];
 
     public void Update(RemapConfig config)
@@ -57,8 +58,8 @@ internal sealed class RemapEngine(IInputSystem system)
 
         switch (k.Vk)
         {
-            case VK_LMENU: return HandleAlt(ref _lAlt, ref _lAltLogical, k.Up);
-            case VK_RMENU: return HandleAlt(ref _rAlt, ref _rAltLogical, k.Up);
+            case VK_LMENU: return OnAlt(ref _lAlt, ref _lAltLogical, k.Up);
+            case VK_RMENU: return OnAlt(ref _rAlt, ref _rAltLogical, k.Up);
             case VK_LSHIFT: _lShift = !k.Up; return false;
             case VK_RSHIFT: _rShift = !k.Up; return false;
             case VK_LCONTROL:
@@ -82,6 +83,9 @@ internal sealed class RemapEngine(IInputSystem system)
             return true;
         }
 
+        // Clicking a window in the Alt+Tab switcher needs a plain click with Alt still held.
+        if (k.Vk == (int)Keys.Tab && (_lAlt || _rAlt)) _altTabActive = true;
+
         return ReinjectWithAlt(k);
     }
 
@@ -92,7 +96,7 @@ internal sealed class RemapEngine(IInputSystem system)
         {
             ReconcileModifiers();
             var cfg = _config;
-            if (!cfg.Enabled || !cfg.CtrlClick || !AltAsCmd(cfg) || Ctrl || Win
+            if (!cfg.Enabled || !cfg.CtrlClick || !AltAsCmd(cfg) || Ctrl || Win || _altTabActive
                 || IsExcluded(cfg, () => system.GetProcessNameAt(point)))
                 return false;
 
@@ -119,7 +123,7 @@ internal sealed class RemapEngine(IInputSystem system)
     {
         ReconcileModifiers();
         var cfg = _config;
-        if (!cfg.Enabled || !cfg.CtrlScroll || !AltAsCmd(cfg) || Ctrl || Win
+        if (!cfg.Enabled || !cfg.CtrlScroll || !AltAsCmd(cfg) || Ctrl || Win || _altTabActive
             || IsExcluded(cfg, () => system.GetProcessNameAt(point)))
             return false;
 
@@ -131,6 +135,13 @@ internal sealed class RemapEngine(IInputSystem system)
         if (!_ctrlClickActive) inputs.Add(new SyntheticInput.Key(VK_LCONTROL, Up: true));
         system.Send(inputs);
         return true;
+    }
+
+    bool OnAlt(ref bool physical, ref bool logical, bool up)
+    {
+        bool swallow = HandleAlt(ref physical, ref logical, up);
+        if (!_lAlt && !_rAlt) _altTabActive = false;
+        return swallow;
     }
 
     static bool HandleAlt(ref bool physical, ref bool logical, bool up)
@@ -246,6 +257,7 @@ internal sealed class RemapEngine(IInputSystem system)
         // Only verifiable while Windows still thinks Alt is down.
         if (_lAltLogical) { Fix(ref _lAlt, VK_LMENU); _lAltLogical = _lAlt; }
         if (_rAltLogical) { Fix(ref _rAlt, VK_RMENU); _rAltLogical = _rAlt; }
+        if (!_lAlt && !_rAlt) _altTabActive = false;
     }
 
     void ResetState()
@@ -253,6 +265,7 @@ internal sealed class RemapEngine(IInputSystem system)
         _resetRequested = false;
         _lAlt = _rAlt = _lAltLogical = _rAltLogical = false;
         _lShift = _rShift = _lCtrl = _rCtrl = _lWin = _rWin = false;
+        _altTabActive = false;
         _swallowedKeyUps.Clear();
     }
 
