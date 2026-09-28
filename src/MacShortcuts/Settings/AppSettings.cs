@@ -78,8 +78,9 @@ public sealed class AppSettings
             .ToHashSet();
 
         bool ctrlClick = IsEnabled(ShortcutCatalog.CtrlClick);
+        bool ctrlScroll = IsEnabled(ShortcutCatalog.CtrlScroll);
 
-        return new RemapConfig(Enabled, UseLeftAlt, UseRightAlt, ctrlClick, map, excluded);
+        return new RemapConfig(Enabled, UseLeftAlt, UseRightAlt, ctrlClick, ctrlScroll, map, excluded);
     }
 }
 

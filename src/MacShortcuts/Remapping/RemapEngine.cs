@@ -15,7 +15,7 @@ namespace MacShortcuts.Remapping;
 /// physically held but logically released, any unmapped key re-presses Alt first, and the
 /// eventual physical Alt key-up is swallowed.
 ///
-/// <see cref="OnKey"/> and <see cref="OnLeftButton"/> must be called from a single thread;
+/// <see cref="OnKey"/>, <see cref="OnLeftButton"/> and <see cref="OnWheel"/> must be called from a single thread;
 /// <see cref="Update"/> and <see cref="ResetKeyState"/> may be called from any thread.
 /// </summary>
 internal sealed class RemapEngine(IInputSystem system)
@@ -111,6 +111,25 @@ internal sealed class RemapEngine(IInputSystem system)
         var ups = new List<SyntheticInput> { new SyntheticInput.LeftButton(Up: true) };
         if (!Ctrl) ups.Add(new SyntheticInput.Key(VK_LCONTROL, Up: true));
         system.Send(ups);
+        return true;
+    }
+
+    /// <returns>true to swallow the wheel event.</returns>
+    public bool OnWheel(int delta, POINT point)
+    {
+        ReconcileModifiers();
+        var cfg = _config;
+        if (!cfg.Enabled || !cfg.CtrlScroll || !AltAsCmd(cfg) || Ctrl || Win
+            || IsExcluded(cfg, () => system.GetProcessNameAt(point)))
+            return false;
+
+        var inputs = new List<SyntheticInput>();
+        ReleaseAlt(inputs);
+        // During an Alt+Click, Ctrl is already down and must stay down until the button is released.
+        if (!_ctrlClickActive) inputs.Add(new SyntheticInput.Key(VK_LCONTROL, Up: false));
+        inputs.Add(new SyntheticInput.Wheel(delta));
+        if (!_ctrlClickActive) inputs.Add(new SyntheticInput.Key(VK_LCONTROL, Up: true));
+        system.Send(inputs);
         return true;
     }
 

@@ -10,4 +10,7 @@ internal abstract record SyntheticInput
     public sealed record Replay(KeyEvent Original) : SyntheticInput;
 
     public sealed record LeftButton(bool Up) : SyntheticInput;
+
+    /// <summary>A vertical wheel movement; positive scrolls up (away from the user).</summary>
+    public sealed record Wheel(int Delta) : SyntheticInput;
 }

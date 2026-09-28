@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using static MacShortcuts.Interop.Kernel32;
@@ -9,6 +10,10 @@ namespace MacShortcuts.Remapping;
 /// Installs low-level keyboard and mouse hooks on a dedicated thread with its own message loop,
 /// so input keeps flowing even while the UI thread is busy. Only one instance can run at a time,
 /// since the native callbacks have no context to find it by.
+///
+/// Windows holds up all input while a low-level hook callback runs, so callbacks must not
+/// inject input themselves: injecting a mouse event from the mouse hook stalls until the hook
+/// times out, and Windows silently removes hooks that time out repeatedly. Use <see cref="Defer"/>.
 /// </summary>
 internal sealed unsafe class LowLevelHooks : IDisposable
 {
@@ -18,10 +23,13 @@ internal sealed unsafe class LowLevelHooks : IDisposable
     /// <returns>true to swallow the event.</returns>
     public delegate bool MouseHandler(IntPtr message, in MSLLHOOKSTRUCT mouse);
 
+    const int WM_RUN_DEFERRED = WM_APP + 1;
+
     static LowLevelHooks? Current;
 
     readonly KeyHandler _onKey;
     readonly MouseHandler _onMouse;
+    readonly ConcurrentQueue<Action> _deferred = new();
     Thread? _thread;
     uint _threadId;
 
@@ -45,7 +53,10 @@ internal sealed unsafe class LowLevelHooks : IDisposable
             var mouse = SetWindowsHookEx(WH_MOUSE_LL, &MouseProc, module, 0);
             ready.Set();
 
-            while (GetMessage(out _, IntPtr.Zero, 0, 0) > 0) { }
+            while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
+            {
+                if (msg.message == WM_RUN_DEFERRED) RunDeferred();
+            }
 
             UnhookWindowsHookEx(kb);
             UnhookWindowsHookEx(mouse);
@@ -57,6 +68,28 @@ internal sealed unsafe class LowLevelHooks : IDisposable
         };
         _thread.Start();
         ready.Wait();
+    }
+
+    /// <summary>Runs <paramref name="action"/> on the hook thread once the current callback has returned.</summary>
+    public void Defer(Action action)
+    {
+        _deferred.Enqueue(action);
+        PostThreadMessage(_threadId, WM_RUN_DEFERRED, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    void RunDeferred()
+    {
+        while (_deferred.TryDequeue(out var action))
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
+        }
     }
 
     public void Dispose()

@@ -43,4 +43,14 @@ public class AppSettingsTests
         settings.Shortcuts[ShortcutCatalog.CtrlClick.Id] = false;
         Assert.False(settings.ToConfig().CtrlClick);
     }
+
+    [Fact]
+    public void ToConfig_CtrlScrollFollowsItsShortcut()
+    {
+        var settings = new AppSettings();
+        Assert.True(settings.ToConfig().CtrlScroll);
+
+        settings.Shortcuts[ShortcutCatalog.CtrlScroll.Id] = false;
+        Assert.False(settings.ToConfig().CtrlScroll);
+    }
 }

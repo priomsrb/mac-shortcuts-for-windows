@@ -218,6 +218,48 @@ public class RemapEngineTests
         AssertSent([]);
     }
 
+    [Fact]
+    public void AltScroll_SendsCtrlScroll()
+    {
+        Press(VK_LMENU);
+        Assert.True(_engine.OnWheel(-120, default));
+        AssertSent([.. ReleasedAlt(VK_LMENU), KeyDown(VK_LCONTROL), new SyntheticInput.Wheel(-120), KeyUp(VK_LCONTROL)]);
+
+        // Alt is already released logically, so later notches only wrap the wheel in Ctrl.
+        Assert.True(_engine.OnWheel(120, default));
+        AssertSent([KeyDown(VK_LCONTROL), new SyntheticInput.Wheel(120), KeyUp(VK_LCONTROL)]);
+    }
+
+    [Fact]
+    public void AltScroll_DuringAltClick_KeepsCtrlHeld()
+    {
+        Press(VK_LMENU);
+        _engine.OnLeftButton(down: true, default);
+        AssertSent([.. ReleasedAlt(VK_LMENU), KeyDown(VK_LCONTROL), new SyntheticInput.LeftButton(Up: false)]);
+
+        Assert.True(_engine.OnWheel(120, default));
+        AssertSent([new SyntheticInput.Wheel(120)]);
+    }
+
+    [Fact]
+    public void PlainScroll_PassesThrough()
+    {
+        Assert.False(_engine.OnWheel(120, default));
+        AssertSent([]);
+    }
+
+    [Fact]
+    public void AltScroll_PassesThroughWhenDisabled()
+    {
+        var settings = new AppSettings();
+        settings.Shortcuts[ShortcutCatalog.CtrlScroll.Id] = false;
+        Configure(settings);
+
+        Press(VK_LMENU);
+        Assert.False(_engine.OnWheel(120, default));
+        AssertSent([]);
+    }
+
     void Configure(AppSettings settings) => _engine.Update(settings.ToConfig());
 
     bool Press(int vk) => Press(new KeyEvent(vk, Up: false));

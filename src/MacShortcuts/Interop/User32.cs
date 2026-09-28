@@ -34,6 +34,7 @@ internal static unsafe partial class User32
     public const int WM_CTLCOLORSTATIC = 0x0138;
     public const int WM_LBUTTONDOWN = 0x0201;
     public const int WM_LBUTTONUP = 0x0202;
+    public const int WM_MOUSEWHEEL = 0x020A;
     public const int WM_WTSSESSION_CHANGE = 0x02B1;
     public const int WM_DPICHANGED = 0x02E0;
     public const int WM_THEMECHANGED = 0x031A;
@@ -121,6 +122,7 @@ internal static unsafe partial class User32
     public const uint KEYEVENTF_KEYUP = 0x0002;
     public const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     public const uint MOUSEEVENTF_LEFTUP = 0x0004;
+    public const uint MOUSEEVENTF_WHEEL = 0x0800;
 
     public const int VK_LSHIFT = 0xA0;
     public const int VK_RSHIFT = 0xA1;

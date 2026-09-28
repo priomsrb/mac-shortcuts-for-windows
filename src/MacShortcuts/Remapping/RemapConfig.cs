@@ -7,9 +7,10 @@ public sealed record RemapConfig(
     bool LeftAlt,
     bool RightAlt,
     bool CtrlClick,
+    bool CtrlScroll,
     IReadOnlyDictionary<Trigger, ShortcutAction> Map,
     IReadOnlySet<string> ExcludedApps)
 {
-    public static RemapConfig Disabled { get; } = new(false, false, false, false,
+    public static RemapConfig Disabled { get; } = new(false, false, false, false, false,
         new Dictionary<Trigger, ShortcutAction>(), new HashSet<string>());
 }

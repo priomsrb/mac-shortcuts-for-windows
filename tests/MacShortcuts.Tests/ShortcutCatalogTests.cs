@@ -27,7 +27,7 @@ public class ShortcutCatalogTests
     public void EveryKeyboardShortcut_HasBindings()
     {
         var empty = ShortcutCatalog.All
-            .Where(s => s != ShortcutCatalog.CtrlClick && s.Bindings.Count == 0)
+            .Where(s => s != ShortcutCatalog.CtrlClick && s != ShortcutCatalog.CtrlScroll && s.Bindings.Count == 0)
             .Select(s => s.Id);
         Assert.Empty(empty);
     }

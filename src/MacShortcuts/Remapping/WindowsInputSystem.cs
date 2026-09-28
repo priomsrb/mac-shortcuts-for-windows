@@ -7,7 +7,8 @@ using static MacShortcuts.Interop.User32;
 
 namespace MacShortcuts.Remapping;
 
-internal sealed class WindowsInputSystem : IInputSystem
+/// <param name="defer">Runs output after the hook callback that produced it has returned; see <see cref="LowLevelHooks"/>.</param>
+internal sealed class WindowsInputSystem(Action<Action> defer) : IInputSystem
 {
     /// <summary>Tags input we inject so our own hooks can ignore it.</summary>
     public static readonly IntPtr Signature = new(0x4D414353); // "MACS"
@@ -23,14 +24,14 @@ internal sealed class WindowsInputSystem : IInputSystem
     public string GetProcessNameAt(POINT point) => GetProcessName(WindowFromPoint(point));
 
     public void MinimizeForegroundWindow() =>
-        PostMessage(GetForegroundWindow(), WM_SYSCOMMAND, SC_MINIMIZE, IntPtr.Zero);
+        defer(() => PostMessage(GetForegroundWindow(), WM_SYSCOMMAND, SC_MINIMIZE, IntPtr.Zero));
 
     public void Send(IReadOnlyList<SyntheticInput> inputs)
     {
         if (inputs.Count == 0) return;
         var native = new INPUT[inputs.Count];
         for (int i = 0; i < native.Length; i++) native[i] = ToNative(inputs[i]);
-        SendInput((uint)native.Length, native, InputSize);
+        defer(() => SendInput((uint)native.Length, native, InputSize));
     }
 
     /// <summary>Forget cached process names, in case a process ID has since been reused.</summary>
@@ -67,6 +68,14 @@ internal sealed class WindowsInputSystem : IInputSystem
             U = new InputUnion
             {
                 mi = new MOUSEINPUT { dwFlags = b.Up ? MOUSEEVENTF_LEFTUP : MOUSEEVENTF_LEFTDOWN, dwExtraInfo = Signature },
+            },
+        },
+        SyntheticInput.Wheel w => new INPUT
+        {
+            type = INPUT_MOUSE,
+            U = new InputUnion
+            {
+                mi = new MOUSEINPUT { mouseData = unchecked((uint)w.Delta), dwFlags = MOUSEEVENTF_WHEEL, dwExtraInfo = Signature },
             },
         },
         _ => throw new UnreachableException(),

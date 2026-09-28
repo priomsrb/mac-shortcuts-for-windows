@@ -8,14 +8,15 @@ namespace MacShortcuts.Remapping;
 /// </summary>
 public sealed class KeyRemapper : IDisposable
 {
-    readonly WindowsInputSystem _system = new();
+    readonly WindowsInputSystem _system;
     readonly RemapEngine _engine;
     readonly LowLevelHooks _hooks;
 
     public KeyRemapper()
     {
-        _engine = new RemapEngine(_system);
         _hooks = new LowLevelHooks(OnKey, OnMouse);
+        _system = new WindowsInputSystem(_hooks.Defer);
+        _engine = new RemapEngine(_system);
     }
 
     public void Start() => _hooks.Start();
@@ -40,8 +41,13 @@ public sealed class KeyRemapper : IDisposable
         && _engine.OnKey(new KeyEvent((int)k.vkCode, Up: (k.flags & LLKHF_UP) != 0,
             k.scanCode, Extended: (k.flags & LLKHF_EXTENDED) != 0));
 
-    bool OnMouse(IntPtr message, in MSLLHOOKSTRUCT m) =>
-        (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP)
-        && m.dwExtraInfo != WindowsInputSystem.Signature
-        && _engine.OnLeftButton(down: message == WM_LBUTTONDOWN, m.pt);
+    bool OnMouse(IntPtr message, in MSLLHOOKSTRUCT m)
+    {
+        if (m.dwExtraInfo == WindowsInputSystem.Signature) return false;
+        if (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP)
+            return _engine.OnLeftButton(down: message == WM_LBUTTONDOWN, m.pt);
+        if (message == WM_MOUSEWHEEL)
+            return _engine.OnWheel((short)(m.mouseData >> 16), m.pt); // The high word is the signed delta.
+        return false;
+    }
 }
