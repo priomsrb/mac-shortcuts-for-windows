@@ -75,16 +75,16 @@ public static class ShortcutCatalog
         // These take over combos Windows already uses, so they start off.
         Add("nav.emacsLineEnds", Text, "Ctrl+A / Ctrl+E", "Home / End", "Go to start / end of line (overrides Select all and similar)",
             [Via(Mods.Ctrl, Keys.A, new Chord(Keys.Home)), Via(Mods.Ctrl, Keys.E, new Chord(Keys.End))], on: false);
-        Add("nav.winLineEnds", Text, "Win+← / Win+→", "Home / End", "Go to start / end of line (overrides window snapping)",
-            [Via(Mods.Win, Keys.Left, new Chord(Keys.Home)), Via(Mods.Win, Keys.Right, new Chord(Keys.End))], on: false);
+        Add("nav.winWord", Text, "Win+← / Win+→", "Ctrl+← / Ctrl+→", "Move one word left / right (overrides window snapping)",
+            [Via(Mods.Win, Keys.Left, new Chord(Keys.Left, Mods.Ctrl)), Via(Mods.Win, Keys.Right, new Chord(Keys.Right, Mods.Ctrl))], on: false);
         Add("nav.winDocEnds", Text, "Win+↑ / Win+↓", "Ctrl+Home / Ctrl+End", "Go to top / bottom of document (overrides maximize / restore)",
             [Via(Mods.Win, Keys.Up, new Chord(Keys.Home, Mods.Ctrl)), Via(Mods.Win, Keys.Down, new Chord(Keys.End, Mods.Ctrl))], on: false);
-        Add("nav.winSelectLine", Text, "Win+Shift+← / →", "Shift+Home / Shift+End", "Select to start / end of line",
-            [Via(Mods.Win, Keys.Left, new Chord(Keys.Home, Mods.Shift), shift: true), Via(Mods.Win, Keys.Right, new Chord(Keys.End, Mods.Shift), shift: true)], on: false);
+        Add("nav.winSelectWord", Text, "Win+Shift+← / →", "Ctrl+Shift+← / →", "Select one word left / right",
+            [Via(Mods.Win, Keys.Left, new Chord(Keys.Left, Mods.Ctrl | Mods.Shift), shift: true), Via(Mods.Win, Keys.Right, new Chord(Keys.Right, Mods.Ctrl | Mods.Shift), shift: true)], on: false);
         Add("nav.winSelectDoc", Text, "Win+Shift+↑ / ↓", "Ctrl+Shift+Home / End", "Select to top / bottom of document",
             [Via(Mods.Win, Keys.Up, new Chord(Keys.Home, Mods.Ctrl | Mods.Shift), shift: true), Via(Mods.Win, Keys.Down, new Chord(Keys.End, Mods.Ctrl | Mods.Shift), shift: true)], on: false);
-        Add("nav.winDeleteLine", Text, "Win+Backspace", "Shift+Home, Backspace", "Delete to start of line",
-            [Via(Mods.Win, Keys.Back, new Chord(Keys.Home, Mods.Shift), new Chord(Keys.Back))], on: false);
+        Add("nav.winDeleteWord", Text, "Win+Backspace", "Ctrl+Backspace", "Delete previous word",
+            [Via(Mods.Win, Keys.Back, new Chord(Keys.Back, Mods.Ctrl))], on: false);
 
         const string Browser = "Browser & tabs";
         Same("tab.new", Browser, Keys.T, "New tab");

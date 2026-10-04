@@ -314,24 +314,24 @@ public class RemapEngineTests
     }
 
     [Fact]
-    public void WinLeft_WhenOn_SendsHomeAndMasksStartMenu()
+    public void WinLeft_WhenOn_SendsCtrlLeftAndMasksStartMenu()
     {
-        Enable("nav.winLineEnds");
+        Enable("nav.winWord");
         Press(VK_LWIN);
         Assert.True(Press(Left));
-        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(Home), KeyUp(Home),
-            KeyDown(VK_LWIN), KeyDown(Mask), KeyUp(Mask)]);
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyDown(VK_LCONTROL), KeyUp(VK_LWIN), KeyDown(Left), KeyUp(Left),
+            KeyUp(VK_LCONTROL), KeyDown(VK_LWIN), KeyDown(Mask), KeyUp(Mask)]);
     }
 
     [Fact]
-    public void WinShiftLeft_WhenOn_SelectsToLineStart()
+    public void WinShiftLeft_WhenOn_SelectsWord()
     {
-        Enable("nav.winSelectLine");
+        Enable("nav.winSelectWord");
         Press(VK_LWIN);
         Press(VK_LSHIFT);
         Assert.True(Press(Left));
-        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(Home), KeyUp(Home),
-            KeyDown(VK_LWIN), KeyDown(Mask), KeyUp(Mask)]);
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyDown(VK_LCONTROL), KeyUp(VK_LWIN), KeyDown(Left), KeyUp(Left),
+            KeyUp(VK_LCONTROL), KeyDown(VK_LWIN), KeyDown(Mask), KeyUp(Mask)]);
     }
 
     [Fact]
