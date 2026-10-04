@@ -69,6 +69,22 @@ public static class ShortcutCatalog
             [Map(Keys.Up, true, new Chord(Keys.Home, Mods.Ctrl | Mods.Shift)), Map(Keys.Down, true, new Chord(Keys.End, Mods.Ctrl | Mods.Shift))]);
         Add("nav.deleteLine", Text, "Alt+Backspace", "Shift+Home, Backspace", "Delete to start of line",
             [Map(Keys.Back, false, new Chord(Keys.Home, Mods.Shift), new Chord(Keys.Back))]);
+        Add("nav.deleteWordForward", Text, "Alt+Delete", "Ctrl+Delete", "Delete next word",
+            [Map(Keys.Delete, false, new Chord(Keys.Delete, Mods.Ctrl))]);
+
+        // These take over combos Windows already uses, so they start off.
+        Add("nav.emacsLineEnds", Text, "Ctrl+A / Ctrl+E", "Home / End", "Go to start / end of line (overrides Select all and similar)",
+            [Via(Mods.Ctrl, Keys.A, new Chord(Keys.Home)), Via(Mods.Ctrl, Keys.E, new Chord(Keys.End))], on: false);
+        Add("nav.winLineEnds", Text, "Win+← / Win+→", "Home / End", "Go to start / end of line (overrides window snapping)",
+            [Via(Mods.Win, Keys.Left, new Chord(Keys.Home)), Via(Mods.Win, Keys.Right, new Chord(Keys.End))], on: false);
+        Add("nav.winDocEnds", Text, "Win+↑ / Win+↓", "Ctrl+Home / Ctrl+End", "Go to top / bottom of document (overrides maximize / restore)",
+            [Via(Mods.Win, Keys.Up, new Chord(Keys.Home, Mods.Ctrl)), Via(Mods.Win, Keys.Down, new Chord(Keys.End, Mods.Ctrl))], on: false);
+        Add("nav.winSelectLine", Text, "Win+Shift+← / →", "Shift+Home / Shift+End", "Select to start / end of line",
+            [Via(Mods.Win, Keys.Left, new Chord(Keys.Home, Mods.Shift), shift: true), Via(Mods.Win, Keys.Right, new Chord(Keys.End, Mods.Shift), shift: true)], on: false);
+        Add("nav.winSelectDoc", Text, "Win+Shift+↑ / ↓", "Ctrl+Shift+Home / End", "Select to top / bottom of document",
+            [Via(Mods.Win, Keys.Up, new Chord(Keys.Home, Mods.Ctrl | Mods.Shift), shift: true), Via(Mods.Win, Keys.Down, new Chord(Keys.End, Mods.Ctrl | Mods.Shift), shift: true)], on: false);
+        Add("nav.winDeleteLine", Text, "Win+Backspace", "Shift+Home, Backspace", "Delete to start of line",
+            [Via(Mods.Win, Keys.Back, new Chord(Keys.Home, Mods.Shift), new Chord(Keys.Back))], on: false);
 
         const string Browser = "Browser & tabs";
         Same("tab.new", Browser, Keys.T, "New tab");
@@ -130,6 +146,12 @@ public static class ShortcutCatalog
 
     static Binding Map(Keys from, bool shift, params Chord[] to) =>
         new(new Trigger(from, shift), new SendKeysAction(to));
+
+    static Binding Via(Mods via, Keys from, Chord chord, bool shift = false) =>
+        new(new Trigger(from, shift, via), new SendKeysAction([chord]));
+
+    static Binding Via(Mods via, Keys from, params Chord[] to) =>
+        new(new Trigger(from, false, via), new SendKeysAction(to));
 
     static string KeyName(Keys key) => key is >= Keys.D0 and <= Keys.D9
         ? ((int)(key - Keys.D0)).ToString(CultureInfo.InvariantCulture)

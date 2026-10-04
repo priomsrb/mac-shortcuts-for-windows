@@ -295,6 +295,59 @@ public class RemapEngineTests
         AssertSent([]);
     }
 
+    [Fact]
+    public void CtrlA_PassesThroughByDefault()
+    {
+        Press(VK_LCONTROL);
+        Assert.False(Press(A));
+        AssertSent([]);
+    }
+
+    [Fact]
+    public void CtrlA_WhenOn_SendsHomeAndKeepsCtrlHeld()
+    {
+        Enable("nav.emacsLineEnds");
+        Press(VK_LCONTROL);
+        Assert.True(Press(A));
+        AssertSent([KeyUp(VK_LCONTROL), KeyDown(Home), KeyUp(Home), KeyDown(VK_LCONTROL)]);
+        Assert.True(Release(A));
+    }
+
+    [Fact]
+    public void WinLeft_WhenOn_SendsHomeAndMasksStartMenu()
+    {
+        Enable("nav.winLineEnds");
+        Press(VK_LWIN);
+        Assert.True(Press(Left));
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(Home), KeyUp(Home),
+            KeyDown(VK_LWIN), KeyDown(Mask), KeyUp(Mask)]);
+    }
+
+    [Fact]
+    public void WinShiftLeft_WhenOn_SelectsToLineStart()
+    {
+        Enable("nav.winSelectLine");
+        Press(VK_LWIN);
+        Press(VK_LSHIFT);
+        Assert.True(Press(Left));
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(Home), KeyUp(Home),
+            KeyDown(VK_LWIN), KeyDown(Mask), KeyUp(Mask)]);
+    }
+
+    [Fact]
+    public void AltDelete_SendsCtrlDelete()
+    {
+        Press(VK_LMENU);
+        Assert.True(Press((int)Keys.Delete));
+    }
+
+    void Enable(string id)
+    {
+        var settings = new AppSettings();
+        settings.Shortcuts[id] = true;
+        Configure(settings);
+    }
+
     void Configure(AppSettings settings) => _engine.Update(settings.ToConfig());
 
     bool Press(int vk) => Press(new KeyEvent(vk, Up: false));

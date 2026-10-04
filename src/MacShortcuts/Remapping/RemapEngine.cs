@@ -83,6 +83,15 @@ internal sealed class RemapEngine(IInputSystem system)
             return true;
         }
 
+        if (cfg.Enabled && !_lAlt && !_rAlt && Ctrl != Win
+            && cfg.Map.TryGetValue(new Trigger((Keys)k.Vk, Shift, Ctrl ? Mods.Ctrl : Mods.Win), out var viaAction)
+            && !IsExcluded(cfg, system.GetForegroundProcessName))
+        {
+            ExecuteWhileHeld(viaAction, Ctrl ? Mods.Ctrl : Mods.Win);
+            _swallowedKeyUps.Add(k.Vk);
+            return true;
+        }
+
         // Clicking a window in the Alt+Tab switcher needs a plain click with Alt still held.
         if (k.Vk == (int)Keys.Tab && (_lAlt || _rAlt)) _altTabActive = true;
 
@@ -183,6 +192,44 @@ internal sealed class RemapEngine(IInputSystem system)
                 inputs.Add(new SyntheticInput.Key((int)chord.Key, Up: true));
             }
             SetMods(inputs, ref current, held);
+        }
+
+        system.Send(inputs);
+
+        if (action is MinimizeWindowAction)
+            system.MinimizeForegroundWindow();
+    }
+
+    /// <summary>
+    /// Run a Ctrl- or Win-triggered action: lift the modifier, send the replacement, then press it again
+    /// so the user can keep holding it. Win is followed by a mask key so releasing it doesn't open Start.
+    /// </summary>
+    void ExecuteWhileHeld(ShortcutAction action, Mods via)
+    {
+        var inputs = new List<SyntheticInput>();
+        if (via == Mods.Win)
+        {
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
+        }
+
+        if (action is SendKeysAction send)
+        {
+            Mods held = via | (Shift ? Mods.Shift : Mods.None);
+            Mods current = held;
+            foreach (var chord in send.Chords)
+            {
+                SetMods(inputs, ref current, chord.Mods);
+                inputs.Add(new SyntheticInput.Key((int)chord.Key, Up: false));
+                inputs.Add(new SyntheticInput.Key((int)chord.Key, Up: true));
+            }
+            SetMods(inputs, ref current, held);
+        }
+
+        if (via == Mods.Win)
+        {
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
         }
 
         system.Send(inputs);
