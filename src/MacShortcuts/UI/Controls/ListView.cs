@@ -16,6 +16,7 @@ internal sealed unsafe class ListView
     readonly List<string> _columns = [];
     Palette? _palette;
     IntPtr _headerFont;
+    int _headerPadding;
     int _dpi = 96;
 
     /// <param name="checkBoxes">A checkbox on each row.</param>
@@ -32,9 +33,17 @@ internal sealed unsafe class ListView
         // Draws the column headers, which report their drawing to the ListView (their parent).
         var self = GCHandle.Alloc(this);
         SetWindowSubclass(Handle, &Subclass, 1, (nuint)GCHandle.ToIntPtr(self));
+        // Makes the column headers taller than their font alone would.
+        if (header) SetWindowSubclass(Header, &HeaderSubclass, 1, (nuint)GCHandle.ToIntPtr(self));
     }
 
     public IntPtr Handle { get; }
+
+    /// <summary>
+    /// Pixels before each new row's checkbox. Indents are counted in small images, which are
+    /// 1 pixel wide once <see cref="ApplyStyle"/> has run.
+    /// </summary>
+    public int ItemIndent { get; set; }
 
     public IntPtr Header => SendMessage(Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
 
@@ -60,13 +69,16 @@ internal sealed unsafe class ListView
 
     public void AddGroup(int id, string header)
     {
+        // A blank subtitle makes the header a line taller, which DrawGroupHeader uses as padding.
         fixed (char* p = header)
+        fixed (char* subtitle = " ")
         {
             var group = new LVGROUP
             {
                 cbSize = (uint)sizeof(LVGROUP),
-                mask = LVGF_HEADER | LVGF_GROUPID,
+                mask = LVGF_HEADER | LVGF_SUBTITLE | LVGF_GROUPID,
                 pszHeader = (IntPtr)p,
+                pszSubtitle = (IntPtr)subtitle,
                 iGroupId = id,
             };
             SendMessage(Handle, LVM_INSERTGROUP, -1, (IntPtr)(&group));
@@ -87,10 +99,11 @@ internal sealed unsafe class ListView
             var item = new LVITEMW
             {
                 // Inserting fails with a group that doesn't exist.
-                mask = LVIF_TEXT | (groupId > 0 ? LVIF_GROUPID : 0),
+                mask = LVIF_TEXT | LVIF_INDENT | (groupId > 0 ? LVIF_GROUPID : 0),
                 iItem = Count,
                 pszText = (IntPtr)p,
                 iGroupId = groupId,
+                iIndent = ItemIndent,
             };
             index = (int)SendMessage(Handle, LVM_INSERTITEMW, IntPtr.Zero, (IntPtr)(&item));
         }
@@ -142,10 +155,13 @@ internal sealed unsafe class ListView
         && ((change->uNewState ^ change->uOldState) & LVIS_STATEIMAGEMASK) != 0;
 
     /// <summary>Colours the list, its headers and checkboxes. Call again after the DPI changes.</summary>
-    public void ApplyStyle(Palette palette, IntPtr font, IntPtr headerFont, int rowHeight, int dpi)
+    /// <param name="headerPadding">Extra space above and below the column headers' titles.</param>
+    /// <param name="groupGap">Space after each group's last row.</param>
+    public void ApplyStyle(Palette palette, IntPtr font, IntPtr headerFont, int rowHeight, int dpi, int headerPadding = 0, int groupGap = 0)
     {
         _palette = palette;
         _headerFont = headerFont;
+        _headerPadding = headerPadding;
         _dpi = dpi;
         SendMessage(Handle, WM_SETFONT, font, 1);
         SendMessage(Handle, LVM_SETBKCOLOR, IntPtr.Zero, (IntPtr)palette.Surface);
@@ -156,6 +172,9 @@ internal sealed unsafe class ListView
         // The list destroys the image list it has when it's destroyed, but not one it's replacing.
         IntPtr old = SendMessage(Handle, LVM_SETIMAGELIST, LVSIL_SMALL, ImageList_Create(1, rowHeight, ILC_COLOR32, 1, 0));
         if (old != IntPtr.Zero) ImageList_Destroy(old);
+
+        var metrics = new LVGROUPMETRICS { cbSize = (uint)sizeof(LVGROUPMETRICS), mask = LVGMF_BORDERSIZE, Bottom = (uint)groupGap };
+        SendMessage(Handle, LVM_SETGROUPMETRICS, IntPtr.Zero, (IntPtr)(&metrics));
 
         DrawCheckBoxes();
     }
@@ -192,18 +211,45 @@ internal sealed unsafe class ListView
         InvalidateRect(Handle, IntPtr.Zero, true);
     }
 
-    /// <summary>Paints a group header: its title, then a line to the right edge.</summary>
+    /// <summary>Paints a group header: its title, centred on a tinted band.</summary>
     public void DrawGroupHeader(IntPtr hdc, int groupId, RECT bounds, Palette palette, IntPtr font)
     {
         int Scale(int value) => value * _dpi / 96;
 
-        Paint.Fill(hdc, bounds, palette.Surface);
-        string text = GetGroupHeader(groupId);
-        var textRect = bounds with { left = bounds.left + Scale(12) };
-        Paint.Text(hdc, text, font, palette.Text, textRect);
-        int lineX = textRect.left + Paint.Measure(text, font).cx + Scale(10);
-        int lineY = bounds.top + (bounds.bottom - bounds.top) / 2;
-        if (lineX < bounds.right - Scale(12)) Paint.HorizontalLine(hdc, lineX, bounds.right - Scale(12), lineY, palette.Divider);
+        Paint.Fill(hdc, bounds, palette.SurfaceAlt);
+        Paint.HorizontalLine(hdc, bounds.left, bounds.right, bounds.top, palette.Divider);
+        Paint.HorizontalLine(hdc, bounds.left, bounds.right, bounds.bottom - 1, palette.Divider);
+        Paint.Text(hdc, GetGroupHeader(groupId), font, palette.Text, bounds with { left = bounds.left + Scale(12) });
+    }
+
+    /// <summary>
+    /// Fills the space between one group's last row and the next group's header, where the
+    /// Explorer theme draws column lines.
+    /// </summary>
+    public void FillGroupGaps(IntPtr hdc, uint color)
+    {
+        for (int i = 1; i < Count; i++)
+        {
+            int group = GetItemGroup(i);
+            if (group == GetItemGroup(i - 1)) continue;
+            int above = GetItemRect(i - 1).bottom;
+            var header = GetGroupHeaderRect(group);
+            if (header.top > above) Paint.Fill(hdc, header with { top = above, bottom = header.top }, color);
+        }
+    }
+
+    int GetItemGroup(int index)
+    {
+        var item = new LVITEMW { mask = LVIF_GROUPID, iItem = index };
+        SendMessage(Handle, LVM_GETITEMW, IntPtr.Zero, (IntPtr)(&item));
+        return item.iGroupId;
+    }
+
+    RECT GetGroupHeaderRect(int groupId)
+    {
+        var rect = new RECT { top = LVGGR_HEADER };
+        SendMessage(Handle, LVM_GETGROUPRECT, groupId, (IntPtr)(&rect));
+        return rect;
     }
 
     string GetGroupHeader(int groupId)
@@ -235,9 +281,9 @@ internal sealed unsafe class ListView
             case CDDS_ITEMPREPAINT:
                 int column = (int)cd->dwItemSpec;
                 Paint.Fill(cd->hdc, cd->rc, palette.SurfaceAlt);
-                // Line the first column's title up with its text, after the checkbox.
-                int indent = column == 0 && Count > 0 ? GetItemRect(0, LVIR_LABEL).left : 0;
-                var textRect = cd->rc with { left = cd->rc.left + indent + Scale(6), right = cd->rc.right - Scale(4) };
+                // Line each title up with its column's text: in the first column, that's after the checkbox.
+                int indent = column == 0 && Count > 0 ? GetItemRect(0, LVIR_LABEL).left + Scale(1) : Scale(3);
+                var textRect = cd->rc with { left = cd->rc.left + indent, right = cd->rc.right - Scale(4) };
                 if (column < _columns.Count)
                     Paint.Text(cd->hdc, _columns[column], _headerFont, palette.MutedText, textRect,
                         DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
@@ -267,5 +313,20 @@ internal sealed unsafe class ListView
                 break;
         }
         return DefSubclassProc(hwnd, msg, wParam, lParam);
+    }
+
+    /// <summary>The column headers' subclass. The ListView frees the shared handle; the headers go first.</summary>
+    [UnmanagedCallersOnly]
+    static IntPtr HeaderSubclass(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam, nuint id, nuint self)
+    {
+        IntPtr result = DefSubclassProc(hwnd, msg, wParam, lParam);
+        if (msg == HDM_LAYOUT && result != 0)
+        {
+            var list = (ListView)GCHandle.FromIntPtr((IntPtr)self).Target!;
+            var layout = (HDLAYOUT*)lParam;
+            layout->pwpos->cy += 2 * list._headerPadding;
+            layout->prc->top += 2 * list._headerPadding;
+        }
+        return result;
     }
 }

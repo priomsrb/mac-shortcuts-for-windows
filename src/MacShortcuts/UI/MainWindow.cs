@@ -199,6 +199,11 @@ internal sealed unsafe partial class MainWindow : Window
                 _settings.SetTheme((AppTheme)wParam.ToInt32());
                 return 0;
 
+            case WM_UPDATEUISTATE:
+                // Focus rings were shown or hidden; the owner-drawn category list doesn't repaint for that itself.
+                InvalidateRect(_categories, IntPtr.Zero, false);
+                break;
+
             case WM_THEMECHANGED:
                 // The list rebuilds its checkbox images too, so redraw them after it.
                 PostMessage(Handle, WM_REDRAW_CHECKBOXES, IntPtr.Zero, IntPtr.Zero);
@@ -299,7 +304,8 @@ internal sealed unsafe partial class MainWindow : Window
             _ => _palette.Window,
         };
         string text = GetText(hwnd);
-        RECT focusRect = Paint.Inflate(rc, -Scale(3));
+        RECT focusRect = rc;
+        int focusRadius = Scale(6);
 
         switch (style.Kind)
         {
@@ -323,7 +329,7 @@ internal sealed unsafe partial class MainWindow : Window
                     int y = rc.top + (height + size.cy) / 2 - Scale(1);
                     Paint.HorizontalLine(hdc, rc.left, rc.left + size.cx, y, _palette.Accent);
                 }
-                focusRect = Paint.Inflate(rc, Scale(1));
+                focusRadius = Scale(4);
                 break;
 
             case ButtonKind.CheckBox:
@@ -334,7 +340,8 @@ internal sealed unsafe partial class MainWindow : Window
                     c => Glyphs.CheckBox(c, 0, 0, box, isChecked, _palette));
                 var label = rc with { left = rc.left + box + Scale(12) };
                 Paint.Text(hdc, text, _fonts.Label, _palette.Text, label);
-                focusRect = label with { right = label.left + Paint.Measure(text, _fonts.Label).cx + Scale(2), left = label.left - Scale(2) };
+                focusRect = label with { left = label.left - Scale(6), right = label.left + Paint.Measure(text, _fonts.Label).cx + Scale(6) };
+                focusRadius = Scale(4);
                 break;
 
             case ButtonKind.Toggle:
@@ -350,7 +357,7 @@ internal sealed unsafe partial class MainWindow : Window
 
             case ButtonKind.Nav:
                 bool selected = Array.IndexOf(_nav, hwnd) == (int)_page;
-                var icon = Array.IndexOf(_nav, hwnd) switch { 0 => Icon.Keyboard, 1 => Icon.Block, _ => Icon.Gear };
+                var icon = Array.IndexOf(_nav, hwnd) switch { 0 => Icon.Keyboard, 1 => Icon.Block, _ => Icon.Wrench };
                 uint color = selected ? _palette.RailSelectedText : _palette.MutedText;
                 int iconSize = Scale(20);
                 Canvas.Render(hdc, rc, backdrop, c =>
@@ -362,16 +369,30 @@ internal sealed unsafe partial class MainWindow : Window
                 var labelRect = rc with { top = rc.top + Scale(9) + iconSize + Scale(4), bottom = rc.bottom - Scale(6) };
                 Paint.Text(hdc, text, selected ? _fonts.CaptionStrong : _fonts.Caption, color, labelRect,
                     DT_SINGLELINE | DT_VCENTER | DT_CENTER);
+                focusRadius = Scale(8);
                 break;
         }
 
-        if (focused)
-        {
-            _ = SetTextColor(hdc, _palette.Text);
-            _ = SetBkColor(hdc, backdrop);
-            DrawFocusRect(hdc, focusRect);
-        }
+        if (focused) DrawFocusRing(hdc, focusRect, focusRadius);
         return CDRF_SKIPDEFAULT;
+    }
+
+    /// <summary>Outlines a control with keyboard focus, just inside <paramref name="rc"/>.</summary>
+    void DrawFocusRing(IntPtr hdc, RECT rc, int radius)
+    {
+        float line = Math.Max(2, Scale(2));
+        int width = rc.right - rc.left, height = rc.bottom - rc.top;
+        Canvas.Render(hdc, rc, null, c => c.StrokeRoundRect(line / 2, line / 2, width - line, height - line, radius - line / 2, line, _palette.Accent));
+    }
+
+    /// <summary>
+    /// Hides focus rings until the keyboard is next used to move around (IsDialogMessage shows them
+    /// again), so clicking a control doesn't outline it.
+    /// </summary>
+    public void HideFocusRings()
+    {
+        const int UIS_SET = 1, UISF_HIDEFOCUS = 0x1;
+        SendMessage(Handle, WM_CHANGEUISTATE, (UISF_HIDEFOCUS << 16) | UIS_SET, IntPtr.Zero);
     }
 
     // Layout
@@ -449,7 +470,7 @@ internal sealed unsafe partial class MainWindow : Window
     {
         foreach (var hwnd in (ReadOnlySpan<IntPtr>)[_filter, _addEdit, _theme])
             SendMessage(hwnd, WM_SETFONT, _fonts.Body, 1);
-        _shortcutList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(34), _dpi);
+        _shortcutList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(34), _dpi, headerPadding: Scale(6), groupGap: Scale(16));
         _excludedList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(56), _dpi);
         SendMessage(_categories, LB_SETITEMHEIGHT, IntPtr.Zero, CategoryItemHeight);
     }

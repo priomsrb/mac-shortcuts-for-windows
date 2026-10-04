@@ -205,14 +205,14 @@ internal sealed unsafe partial class MainWindow
         if (_descriptions.TryGetValue(name, out string? description))
         {
             int middle = bounds.top + height / 2;
-            Paint.Text(hdc, name, _fonts.MonoStrong, _palette.Text, text with { bottom = middle + Scale(1) },
+            Paint.Text(hdc, name, _fonts.BodyStrong, _palette.Text, text with { bottom = middle + Scale(1) },
                 DT_SINGLELINE | DT_BOTTOM | DT_END_ELLIPSIS);
             Paint.Text(hdc, description, _fonts.Small, _palette.MutedText, text with { top = middle + Scale(2) },
                 DT_SINGLELINE | DT_END_ELLIPSIS);
         }
         else
         {
-            Paint.Text(hdc, name, _fonts.MonoStrong, _palette.Text, text, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            Paint.Text(hdc, name, _fonts.BodyStrong, _palette.Text, text, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
         }
 
         if (row < _excludedApps.Count - 1) Paint.HorizontalLine(hdc, bounds.left, bounds.right, bounds.bottom - 1, _palette.Divider);

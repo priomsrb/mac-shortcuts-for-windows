@@ -1,6 +1,6 @@
 namespace MacShortcuts.UI.Drawing;
 
-internal enum Icon { Keyboard, Block, Gear, Folder, Search }
+internal enum Icon { Keyboard, Block, Wrench, Folder, Search }
 
 /// <summary>The window's icons and control glyphs, drawn as strokes on a <see cref="Canvas"/>.</summary>
 internal static class Glyphs
@@ -27,16 +27,8 @@ internal static class Glyphs
                 c.Lines(w, color, P(3.8f, 12.2f), P(12.2f, 3.8f));
                 break;
 
-            case Icon.Gear:
-                c.StrokeEllipse(x + 5.5f * s, y + 5.5f * s, 5 * s, 5 * s, w, color);
-                c.Lines(w, color, P(8, 1.5f), P(8, 3.5f));
-                c.Lines(w, color, P(8, 12.5f), P(8, 14.5f));
-                c.Lines(w, color, P(1.5f, 8), P(3.5f, 8));
-                c.Lines(w, color, P(12.5f, 8), P(14.5f, 8));
-                c.Lines(w, color, P(3.4f, 3.4f), P(4.8f, 4.8f));
-                c.Lines(w, color, P(11.2f, 11.2f), P(12.6f, 12.6f));
-                c.Lines(w, color, P(3.4f, 12.6f), P(4.8f, 11.2f));
-                c.Lines(w, color, P(11.2f, 4.8f), P(12.6f, 3.4f));
+            case Icon.Wrench:
+                c.Lines(w, color, [.. Wrench().Select(p => P(p.X, p.Y))]);
                 break;
 
             case Icon.Folder:
@@ -48,6 +40,39 @@ internal static class Glyphs
                 c.Lines(w, color, P(10.5f, 10.5f), P(14, 14));
                 break;
         }
+    }
+
+    /// <summary>
+    /// The outline of a wrench on the 16×16 grid: a round head at the top right with an open jaw,
+    /// and a handle with a rounded end reaching to the bottom left.
+    /// </summary>
+    static List<(float X, float Y)> Wrench()
+    {
+        const float headX = 10.5f, headY = 5.5f, radius = 4f, handleLength = 9.5f, handleHalfWidth = 1.4f;
+        const float jawHalfWidth = 1.4f, jawDepth = 1f;
+        const int steps = 12;
+
+        // Points are placed along the handle (a, towards the jaw) and across it (b).
+        var points = new List<(float X, float Y)>();
+        float k = MathF.Sqrt(0.5f);
+        void Add(float a, float b) => points.Add((headX + (a + b) * k, headY + (b - a) * k));
+        void Arc(float cx, float r, float from, float to)
+        {
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = from + (to - from) * i / steps;
+                Add(cx + r * MathF.Cos(t), r * MathF.Sin(t));
+            }
+        }
+
+        float jaw = MathF.Asin(jawHalfWidth / radius), neck = MathF.Asin(handleHalfWidth / radius);
+        Add(jawDepth, jawHalfWidth);
+        Arc(0, radius, jaw, MathF.PI - neck);
+        Arc(-handleLength, handleHalfWidth, MathF.PI / 2, 3 * MathF.PI / 2);
+        Arc(0, radius, MathF.PI + neck, 2 * MathF.PI - jaw);
+        Add(jawDepth, -jawHalfWidth);
+        Add(jawDepth, jawHalfWidth);
+        return points;
     }
 
     /// <summary>A <paramref name="size"/>-pixel checkbox.</summary>

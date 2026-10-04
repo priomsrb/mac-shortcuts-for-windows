@@ -15,8 +15,11 @@ internal sealed unsafe class Canvas
 
     Canvas(IntPtr dc) => _dc = dc;
 
-    /// <summary>Draws onto <paramref name="bounds"/> of <paramref name="hdc"/>, which is first filled with <paramref name="background"/>.</summary>
-    public static void Render(IntPtr hdc, RECT bounds, uint background, Action<Canvas> draw)
+    /// <summary>
+    /// Draws onto <paramref name="bounds"/> of <paramref name="hdc"/>, which is first filled with
+    /// <paramref name="background"/>, or kept as it is when that's null.
+    /// </summary>
+    public static void Render(IntPtr hdc, RECT bounds, uint? background, Action<Canvas> draw)
     {
         int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
         if (width <= 0 || height <= 0) return;
@@ -25,7 +28,16 @@ internal sealed unsafe class Canvas
         IntPtr bitmap = CreateCompatibleBitmap(hdc, width * Factor, height * Factor);
         IntPtr oldBitmap = SelectObject(dc, bitmap);
         var canvas = new Canvas(dc);
-        canvas.FillRect(0, 0, width, height, background);
+        if (background is { } color)
+        {
+            canvas.FillRect(0, 0, width, height, color);
+        }
+        else
+        {
+            // Scaled up without smoothing, the pixels come back unchanged when scaled down.
+            _ = SetStretchBltMode(dc, COLORONCOLOR);
+            StretchBlt(dc, 0, 0, width * Factor, height * Factor, hdc, bounds.left, bounds.top, width, height, SRCCOPY);
+        }
         draw(canvas);
 
         int oldMode = SetStretchBltMode(hdc, HALFTONE);

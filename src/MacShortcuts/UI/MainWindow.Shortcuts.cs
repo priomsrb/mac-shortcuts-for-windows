@@ -84,6 +84,7 @@ internal sealed unsafe partial class MainWindow
         SendMessage(_shortcutList.Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero);
         _shortcutList.Clear();
         _rows.Clear();
+        _shortcutList.ItemIndent = Scale(10);
         _shortcutList.EnableGroups(all);
         var catalog = ShortcutCatalog.All;
         for (int i = 0; i < catalog.Count; i++)
@@ -132,7 +133,9 @@ internal sealed unsafe partial class MainWindow
         _loading = true;
         _shortcutList.RecreateCheckBoxes();
         _loading = false;
-        SyncShortcutList();
+        // Re-adds the rows with their checks and an indent at the new DPI.
+        RebuildShortcutList();
+        InvalidateRect(_categories, IntPtr.Zero, false);
     }
 
     IntPtr OnShortcutListNotify(NMHDR* header)
@@ -168,6 +171,7 @@ internal sealed unsafe partial class MainWindow
                 GetClientRect(_shortcutList.Handle, out var client);
                 int top = _shortcutList.Count > 0 ? _shortcutList.GetItemRect(_shortcutList.Count - 1).bottom : client.top;
                 if (top < client.bottom) Paint.Fill(cd->nmcd.hdc, client with { top = top }, _palette.Surface);
+                _shortcutList.FillGroupGaps(cd->nmcd.hdc, _palette.Surface);
                 return CDRF_DODEFAULT;
 
             case CDDS_ITEMPREPAINT:
@@ -177,7 +181,7 @@ internal sealed unsafe partial class MainWindow
             case CDDS_SUBITEMPREPAINT:
                 ColorRow(cd);
                 if (cd->iSubItem == 1) cd->clrText = (int)_palette.MutedText;
-                SelectObject(cd->nmcd.hdc, cd->iSubItem switch { 0 => _fonts.MonoStrong, 1 => _fonts.Mono, _ => _fonts.Body });
+                SelectObject(cd->nmcd.hdc, cd->iSubItem switch { 0 => _fonts.BodyStrong, _ => _fonts.Body });
                 return CDRF_NEWFONT;
 
             case CDDS_ITEMPOSTPAINT:
@@ -224,10 +228,7 @@ internal sealed unsafe partial class MainWindow
         Paint.Text(hdc, $"{on}/{total}", _fonts.Small, _palette.MutedText, text, DT_SINGLELINE | DT_VCENTER | DT_RIGHT);
         Paint.Text(hdc, category, selected ? _fonts.BodyStrong : _fonts.Body, selected ? _palette.SelectionText : _palette.Text, text);
         if ((item->itemState & ODS_FOCUS) != 0 && (item->itemState & ODS_NOFOCUSRECT) == 0)
-        {
-            _ = SetTextColor(hdc, _palette.Text);
-            DrawFocusRect(hdc, Paint.Inflate(rc, -Scale(1)));
-        }
+            DrawFocusRing(hdc, rc with { top = rc.top + 1, bottom = rc.bottom - 1 }, Scale(6));
     }
 
     void LayoutShortcutsPage(RECT client)

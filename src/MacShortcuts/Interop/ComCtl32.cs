@@ -59,11 +59,14 @@ internal static partial class ComCtl32
     public const int LVM_SETTEXTBKCOLOR = LVM_FIRST + 38;
     public const int LVM_SETEXTENDEDLISTVIEWSTYLE = LVM_FIRST + 54;
     public const int LVM_GETITEMCOUNT = LVM_FIRST + 4;
+    public const int LVM_GETITEMW = LVM_FIRST + 75;
     public const int LVM_INSERTITEMW = LVM_FIRST + 77;
     public const int LVM_SETITEMTEXTW = LVM_FIRST + 116;
     public const int LVM_INSERTCOLUMNW = LVM_FIRST + 97;
     public const int LVM_INSERTGROUP = LVM_FIRST + 145;
     public const int LVM_GETGROUPINFO = LVM_FIRST + 149;
+    public const int LVM_SETGROUPMETRICS = LVM_FIRST + 155;
+    public const int LVM_GETGROUPRECT = LVM_FIRST + 98;
     public const int LVM_ENABLEGROUPVIEW = LVM_FIRST + 157;
 
     public const int LVN_FIRST = -100;
@@ -78,10 +81,12 @@ internal static partial class ComCtl32
     // Header
     public const int HDM_GETITEMCOUNT = 0x1200;
     public const int HDM_GETITEMRECT = 0x1200 + 7;
+    public const int HDM_LAYOUT = 0x1200 + 5;
 
     public const uint LVIF_TEXT = 0x1;
     public const uint LVIF_STATE = 0x8;
     public const uint LVIF_PARAM = 0x4;
+    public const uint LVIF_INDENT = 0x10;
     public const uint LVIF_GROUPID = 0x100;
     public const uint LVIS_STATEIMAGEMASK = 0xF000;
     public const uint LVCF_WIDTH = 0x2;
@@ -90,6 +95,9 @@ internal static partial class ComCtl32
     public const int LVCDI_GROUP = 0x1;
     public const uint LVGF_HEADER = 0x1;
     public const uint LVGF_GROUPID = 0x10;
+    public const uint LVGF_SUBTITLE = 0x100;
+    public const uint LVGMF_BORDERSIZE = 0x1;
+    public const int LVGGR_HEADER = 1;
     public const int LVSIL_STATE = 2;
 
     const int WM_USER = 0x0400;
@@ -239,6 +247,42 @@ internal static partial class ComCtl32
         public uint cItems;
         public IntPtr pszSubsetTitle;
         public uint cchSubsetTitle;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WINDOWPOS
+    {
+        public IntPtr hwnd;
+        public IntPtr hwndInsertAfter;
+        public int x;
+        public int y;
+        public int cx;
+        public int cy;
+        public uint flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct HDLAYOUT
+    {
+        public RECT* prc;
+        public WINDOWPOS* pwpos;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LVGROUPMETRICS
+    {
+        public uint cbSize;
+        public uint mask;
+        public uint Left;
+        public uint Top;
+        public uint Right;
+        public uint Bottom;
+        public uint crLeft;
+        public uint crTop;
+        public uint crRight;
+        public uint crBottom;
+        public uint crHeader;
+        public uint crFooter;
     }
 
     [LibraryImport("comctl32.dll")]

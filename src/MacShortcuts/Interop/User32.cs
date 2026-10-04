@@ -31,12 +31,15 @@ internal static unsafe partial class User32
     public const int WM_COMMAND = 0x0111;
     public const int WM_SYSCOMMAND = 0x0112;
     public const int WM_TIMER = 0x0113;
+    public const int WM_CHANGEUISTATE = 0x0127;
+    public const int WM_UPDATEUISTATE = 0x0128;
     public const int WM_CTLCOLOREDIT = 0x0133;
     public const int WM_CTLCOLORLISTBOX = 0x0134;
     public const int WM_CTLCOLORBTN = 0x0135;
     public const int WM_CTLCOLORSTATIC = 0x0138;
     public const int WM_LBUTTONDOWN = 0x0201;
     public const int WM_LBUTTONUP = 0x0202;
+    public const int WM_RBUTTONDOWN = 0x0204;
     public const int WM_MOUSEWHEEL = 0x020A;
     public const int WM_WTSSESSION_CHANGE = 0x02B1;
     public const int WM_DPICHANGED = 0x02E0;

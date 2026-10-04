@@ -54,8 +54,13 @@ internal sealed unsafe class TrayApp : Window, IDisposable
     {
         while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
         {
-            // Tab and arrow-key navigation between the settings window's controls.
-            if (_window is { Handle: var dialog } && dialog != IntPtr.Zero && IsDialogMessage(dialog, msg)) continue;
+            if (_window is { Handle: var dialog } && dialog != IntPtr.Zero)
+            {
+                if (msg.message is WM_LBUTTONDOWN or WM_RBUTTONDOWN && (msg.hwnd == dialog || IsChild(dialog, msg.hwnd)))
+                    _window.HideFocusRings();
+                // Tab and arrow-key navigation between the settings window's controls.
+                if (IsDialogMessage(dialog, msg)) continue;
+            }
             TranslateMessage(msg);
             DispatchMessage(msg);
         }

@@ -14,6 +14,7 @@ internal static unsafe partial class Gdi32
     public const int PS_JOIN_ROUND = 0x0;
     public const int NULL_BRUSH = 5;
     public const int NULL_PEN = 8;
+    public const int COLORONCOLOR = 3;
     public const int HALFTONE = 4;
     public const uint SRCCOPY = 0x00CC0020;
 
