@@ -148,6 +148,11 @@ internal sealed unsafe partial class MainWindow
                     _settings.SetShortcutEnabled(ShortcutCatalog.All[_rows[row]], _shortcutList.IsChecked(row));
                 return 0;
 
+            case LVN_ENDSCROLL:
+                // Scrolling can leave the column headers partly painted over; draw them again.
+                InvalidateRect(_shortcutList.Header, IntPtr.Zero, true);
+                return 0;
+
             case NM_CUSTOMDRAW:
                 return DrawShortcutRow((NMLVCUSTOMDRAW*)header);
         }

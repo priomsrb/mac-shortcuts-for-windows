@@ -71,6 +71,7 @@ internal static partial class ComCtl32
 
     public const int LVN_FIRST = -100;
     public const int LVN_ITEMCHANGED = LVN_FIRST - 1;
+    public const int LVN_ENDSCROLL = LVN_FIRST - 81;
     public const int LVN_KEYDOWN = LVN_FIRST - 55;
     public const int LVNI_SELECTED = 0x2;
     public const int LVIR_BOUNDS = 0;
