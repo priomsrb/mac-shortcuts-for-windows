@@ -199,35 +199,6 @@ h1 { font-size: clamp(40px, 5.4vw, 64px); font-weight: 700; letter-spacing: -0.0
 .section-head p { margin-top: 16px; color: var(--muted); font-size: 19px; }
 @media (max-width: 700px) { .section { padding: 72px 0; } .section-head { margin-bottom: 40px; } }
 
-/* ---------- Keyboard rows ---------- */
-.boards { margin: 0 auto; max-width: 860px; display: grid; gap: 18px; }
-.board-wrap { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 16px; }
-.board-name { font-size: 14px; font-weight: 600; color: var(--muted); text-align: right; }
-.board {
-  display: grid; grid-template-columns: 1fr 1fr 1fr 1.35fr 4fr 1.35fr 1fr; gap: 8px;
-  padding: 10px; border-radius: 16px; background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow);
-}
-.bk {
-  display: grid; place-items: end start; height: 54px; padding: 7px 9px;
-  font-size: 12px; font-weight: 500; color: var(--muted);
-  background: linear-gradient(180deg, var(--key-top), var(--key-bottom));
-  border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 0 var(--key-edge);
-  white-space: nowrap; overflow: hidden;
-}
-.bk-hl {
-  color: #fff; font-weight: 600;
-  background: linear-gradient(180deg, #3b82f6, #2563eb);
-  border-color: transparent; box-shadow: 0 2px 0 #1e40af, 0 6px 16px rgba(37, 99, 235, 0.35);
-}
-.boards figcaption { text-align: center; color: var(--muted); font-size: 15px; margin-top: 12px; }
-@media (max-width: 700px) {
-  .board-wrap { grid-template-columns: 1fr; gap: 6px; }
-  .board-name { text-align: left; }
-  .board { gap: 4px; padding: 6px; grid-template-columns: 1fr 1fr 1fr 1.3fr 2.2fr 1.3fr 1fr; }
-  .bk { height: 44px; font-size: 10px; padding: 5px; place-items: end center; }
-}
-@media (max-width: 420px) { .bk { font-size: 9px; } }
-
 /* ---------- Tour ---------- */
 .tour { display: flex; flex-direction: column; align-items: center; }
 .tour-tabs {
@@ -340,5 +311,3 @@ h1 { font-size: clamp(40px, 5.4vw, 64px); font-weight: 700; letter-spacing: -0.0
 .footer-links a { color: var(--muted); }
 .footer-links a:hover { color: var(--text); }
 .footer-note { width: 100%; font-size: 13px; color: var(--muted); }
-.bk .sm { display: none; }
-@media (max-width: 700px) { .bk .lg { display: none; } .bk .sm { display: inline; } }
