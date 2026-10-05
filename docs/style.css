@@ -249,6 +249,33 @@ h1 { font-size: clamp(40px, 5.4vw, 64px); font-weight: 700; letter-spacing: -0.0
 }
 .shot-frame img { display: block; width: 100%; height: auto; }
 
+/* ---------- Tray mock ---------- */
+.tray { margin: 64px auto 0; display: flex; flex-direction: column; align-items: flex-end; width: fit-content; max-width: 100%; }
+.tray-menu {
+  width: 248px; padding: 6px; margin-right: 52px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+  font-size: 14px; color: var(--text); text-align: left;
+}
+.tm-item { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px 0 34px; border-radius: 6px; position: relative; }
+.tm-item:first-child { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.tm-default { font-weight: 650; }
+.tm-check { position: absolute; left: 12px; font-size: 13px; }
+.tm-shield { position: absolute; left: 11px; width: 16px; height: 16px; }
+.tm-sep { height: 1px; margin: 4px 8px; background: var(--border); }
+.tray-bar {
+  display: flex; align-items: center; gap: 14px; height: 48px; margin-top: 10px; padding: 0 16px;
+  border-radius: 12px; background: color-mix(in srgb, var(--card) 88%, var(--bg-alt)); border: 1px solid var(--border);
+  box-shadow: var(--shadow); font-size: 12px; line-height: 1.15; color: var(--muted);
+}
+.tb-chev { font-size: 14px; }
+.tb-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; background: color-mix(in srgb, var(--text) 10%, transparent); }
+.tb-icon img { display: block; border-radius: 4px; }
+.tb-ic { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); opacity: .7; }
+.tb-vol { border-radius: 3px; }
+.tb-clock { text-align: right; }
+.tray figcaption { align-self: center; margin-top: 16px; color: var(--muted); font-size: 15px; text-align: center; }
+@media (max-width: 420px) { .tray-menu { margin-right: 0; width: 100%; } .tray { width: 100%; } }
+
 /* ---------- Shortcut cards ---------- */
 .sc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .sc-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 24px; box-shadow: var(--shadow); }
