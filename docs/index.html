@@ -6,6 +6,17 @@
   <title>Mac Shortcuts for Windows</title>
   <meta name="description" content="Use macOS-style keyboard shortcuts on Windows. Your Alt key becomes ⌘ Cmd: Alt+C copies, Alt+V pastes, Alt+Q quits. A tiny, free tray app.">
   <meta name="color-scheme" content="light dark">
+  <script>
+    // Extensions like Dark Reader only treat a page as natively dark when the
+    // meta says exactly "dark", so mirror the OS scheme that style.css follows.
+    (function () {
+      var meta = document.querySelector('meta[name="color-scheme"]');
+      var mq = matchMedia("(prefers-color-scheme: dark)");
+      function sync() { meta.content = mq.matches ? "dark" : "light dark"; }
+      sync();
+      mq.addEventListener("change", sync);
+    })();
+  </script>
   <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Mac Shortcuts for Windows">
