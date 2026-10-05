@@ -56,6 +56,13 @@ internal sealed record Palette
     public required uint Tile { get; init; }
     public required uint TileText { get; init; }
 
+    /// <summary>Keycaps: the face, the edge below it and the text; and the same for Cmd (Alt) keys.</summary>
+    public required uint KeyFace { get; init; }
+    public required uint KeyEdge { get; init; }
+    public required uint KeyText { get; init; }
+    public required uint KeyCmdFace { get; init; }
+    public required uint KeyCmdEdge { get; init; }
+
     public static Palette Light { get; } = new()
     {
         IsDark = false,
@@ -81,6 +88,11 @@ internal sealed record Palette
         RailSelectedText = Hex(0x1F4439),
         Tile = Hex(0xEEEBE6),
         TileText = Hex(0x4B4944),
+        KeyFace = Hex(0xF3F1ED),
+        KeyEdge = Hex(0xBDB9B1),
+        KeyText = Hex(0x22211F),
+        KeyCmdFace = Hex(0xDDEAE5),
+        KeyCmdEdge = Hex(0x93B5A9),
     };
 
     public static Palette Dark { get; } = new()
@@ -108,6 +120,11 @@ internal sealed record Palette
         RailSelectedText = Hex(0xC8EBDD),
         Tile = Hex(0x34322F),
         TileText = Hex(0xC9C6C0),
+        KeyFace = Hex(0x3A3835),
+        KeyEdge = Hex(0x1A1918),
+        KeyText = Hex(0xECEBE8),
+        KeyCmdFace = Hex(0x35504A),
+        KeyCmdEdge = Hex(0x1A2925),
     };
 
     public static Palette For(bool dark) => dark ? Dark : Light;

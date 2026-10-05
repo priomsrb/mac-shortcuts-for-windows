@@ -24,6 +24,8 @@ internal sealed unsafe partial class MainWindow
     /// <summary>The catalog index of each row in the list.</summary>
     readonly List<int> _rows = [];
 
+    const int KeysColumnWidth = 270;
+
     int CategoryItemHeight => Scale(30);
 
     string SelectedCategory
@@ -47,8 +49,8 @@ internal sealed unsafe partial class MainWindow
 
         _shortcutList = new ListView(Handle, checkBoxes: true, header: true);
         _pageControls[(int)Page.Shortcuts].Add(_shortcutList.Handle);
-        _shortcutList.AddColumn("Mac-style shortcut", Scale(210));
-        _shortcutList.AddColumn("Sends", Scale(200));
+        _shortcutList.AddColumn("Mac-style shortcut", Scale(KeysColumnWidth));
+        _shortcutList.AddColumn("Sends", Scale(KeysColumnWidth));
         _shortcutList.AddColumn("Action", Scale(300));
         for (int i = 1; i < Categories.Length; i++) _shortcutList.AddGroup(i, Categories[i]);
         RebuildShortcutList();
@@ -84,7 +86,6 @@ internal sealed unsafe partial class MainWindow
         SendMessage(_shortcutList.Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero);
         _shortcutList.Clear();
         _rows.Clear();
-        _shortcutList.ItemIndent = Scale(10);
         _shortcutList.EnableGroups(all);
         var catalog = ShortcutCatalog.All;
         for (int i = 0; i < catalog.Count; i++)
@@ -129,7 +130,7 @@ internal sealed unsafe partial class MainWindow
 
     void OnShortcutsDpiChanged()
     {
-        for (int i = 0; i < 2; i++) _shortcutList.SetColumnWidth(i, Scale(i == 0 ? 210 : 200));
+        for (int i = 0; i < 2; i++) _shortcutList.SetColumnWidth(i, Scale(KeysColumnWidth));
         _loading = true;
         _shortcutList.RecreateCheckBoxes();
         _loading = false;
@@ -202,10 +203,39 @@ internal sealed unsafe partial class MainWindow
                     StretchBlt(cd->nmcd.hdc, x - lineWidth / 2, bounds.top, lineWidth, rowHeight,
                         cd->nmcd.hdc, x - lineWidth / 2 - 1, bounds.top, 1, rowHeight, SRCCOPY);
                 }
-                Paint.HorizontalLine(cd->nmcd.hdc, bounds.left, bounds.right, bounds.bottom - 1, _palette.Divider);
+                DrawKeyCaps(cd->nmcd.hdc, (int)cd->nmcd.dwItemSpec, bounds);
+                // A selected row keeps the theme's outline along its bottom edge.
+                if (!_shortcutList.IsSelected((int)cd->nmcd.dwItemSpec))
+                    Paint.HorizontalLine(cd->nmcd.hdc, bounds.left, bounds.right, bounds.bottom - 1, _palette.Divider);
                 return CDRF_DODEFAULT;
         }
         return CDRF_DODEFAULT;
+    }
+
+    /// <summary>The colour at a point in a row, or the list's own background if it can't be read.</summary>
+    uint RowBackground(IntPtr hdc, int x, int y)
+    {
+        uint color = GetPixel(hdc, x, y);
+        return color == 0xFFFFFFFF ? _palette.Surface : color;
+    }
+
+    /// <summary>Replaces the key columns' text with keycaps.</summary>
+    void DrawKeyCaps(IntPtr hdc, int row, RECT bounds)
+    {
+        if (row < 0 || row >= _rows.Count) return;
+        var shortcut = ShortcutCatalog.All[_rows[row]];
+        int padding = Scale(6);
+        int left = _shortcutList.GetItemRect(row, LVIR_LABEL).left;
+        for (int column = 0; column < 2; column++)
+        {
+            int right = bounds.left + (column == 0 ? 0 : _shortcutList.GetColumnWidth(0)) + _shortcutList.GetColumnWidth(column);
+            var cell = new RECT { left = left, top = bounds.top + 1, right = right - padding, bottom = bounds.bottom - 1 };
+            // Covers the text with the row's own background (selection, hover), sampled from the cell's empty right edge.
+            Paint.Fill(hdc, cell with { right = right }, RowBackground(hdc, right - 2, (bounds.top + bounds.bottom) / 2));
+            KeyCaps.Draw(hdc, cell, column == 0 ? shortcut.TriggerText : shortcut.SendsText, column == 0,
+                _palette, _fonts.Key, _fonts.KeySymbol, _dpi);
+            left = right;
+        }
     }
 
     /// <summary>Draws the selected row in the palette's colours instead of the system highlight.</summary>

@@ -123,6 +123,19 @@ internal static unsafe partial class Gdi32
         IntPtr source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, uint rop);
 
     [LibraryImport("gdi32.dll")]
+    public static partial uint GetPixel(IntPtr hdc, int x, int y);
+
+    [LibraryImport("gdi32.dll")]
+    public static partial int SaveDC(IntPtr hdc);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RestoreDC(IntPtr hdc, int savedDc);
+
+    [LibraryImport("gdi32.dll")]
+    public static partial int IntersectClipRect(IntPtr hdc, int left, int top, int right, int bottom);
+
+    [LibraryImport("gdi32.dll")]
     public static partial int SetStretchBltMode(IntPtr hdc, int mode);
 
     [LibraryImport("gdi32.dll")]

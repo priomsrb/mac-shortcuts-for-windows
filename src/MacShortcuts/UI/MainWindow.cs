@@ -470,6 +470,7 @@ internal sealed unsafe partial class MainWindow : Window
     {
         foreach (var hwnd in (ReadOnlySpan<IntPtr>)[_filter, _addEdit, _theme])
             SendMessage(hwnd, WM_SETFONT, _fonts.Body, 1);
+        _shortcutList.CheckBoxPadding = Scale(10);
         _shortcutList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(34), _dpi, headerPadding: Scale(6), groupGap: Scale(16));
         _excludedList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(56), _dpi);
         SendMessage(_categories, LB_SETITEMHEIGHT, IntPtr.Zero, CategoryItemHeight);

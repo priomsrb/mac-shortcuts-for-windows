@@ -45,6 +45,12 @@ internal sealed unsafe class ListView
     /// </summary>
     public int ItemIndent { get; set; }
 
+    /// <summary>
+    /// Pixels of empty space before each checkbox, inside its image so that the row's highlight
+    /// includes it. Takes effect in <see cref="DrawCheckBoxes"/>.
+    /// </summary>
+    public int CheckBoxPadding { get; set; }
+
     public IntPtr Header => SendMessage(Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
 
     public int Count => (int)SendMessage(Handle, LVM_GETITEMCOUNT, IntPtr.Zero, IntPtr.Zero);
@@ -199,12 +205,23 @@ internal sealed unsafe class ListView
         IntPtr images = SendMessage(Handle, LVM_GETIMAGELIST, LVSIL_STATE, IntPtr.Zero);
         if (images == IntPtr.Zero || _palette is not { } palette) return;
         ImageList_GetIconSize(images, out int width, out int height);
-        float size = MathF.Min(16f * _dpi / 96, MathF.Min(width, height));
+        // The images are square until padded; resizing the list clears it, so the glyphs are drawn again.
+        int padding = CheckBoxPadding;
+        if (width != height + padding)
+        {
+            // The list only takes a new image size from a new image list.
+            width = height + padding;
+            IntPtr old = SendMessage(Handle, LVM_SETIMAGELIST, LVSIL_STATE, ImageList_Create(width, height, ILC_COLOR32, 2, 0));
+            if (old != IntPtr.Zero && old != images) ImageList_Destroy(old);
+            images = SendMessage(Handle, LVM_GETIMAGELIST, LVSIL_STATE, IntPtr.Zero);
+            ImageList_SetImageCount(images, 2);
+        }
+        float size = MathF.Min(16f * _dpi / 96, height);
         for (int i = 0; i < 2; i++)
         {
             bool isChecked = i == 1;
             IntPtr bitmap = Canvas.RenderBitmap(width, height,
-                c => Glyphs.CheckBox(c, (width - size) / 2, (height - size) / 2, size, isChecked, palette));
+                c => Glyphs.CheckBox(c, padding + (height - size) / 2, (height - size) / 2, size, isChecked, palette));
             ImageList_Replace(images, i, bitmap, IntPtr.Zero);
             DeleteObject(bitmap);
         }

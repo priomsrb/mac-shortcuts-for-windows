@@ -313,6 +313,14 @@ internal static partial class ComCtl32
     public static partial bool ImageList_Replace(IntPtr imageList, int index, IntPtr image, IntPtr mask);
 
     [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ImageList_SetIconSize(IntPtr imageList, int cx, int cy);
+
+    [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ImageList_SetImageCount(IntPtr imageList, uint count);
+
+    [LibraryImport("comctl32.dll")]
     public static partial IntPtr ImageList_Create(int cx, int cy, uint flags, int initial, int grow);
 
     [LibraryImport("comctl32.dll")]

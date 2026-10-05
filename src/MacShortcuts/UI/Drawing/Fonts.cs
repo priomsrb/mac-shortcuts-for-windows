@@ -32,6 +32,8 @@ internal sealed unsafe class Fonts
         Title = Make(22, FW_SEMIBOLD, DisplayFace);
         Heading = Make(18, FW_SEMIBOLD, DisplayFace);
         Subheading = Make(16, FW_SEMIBOLD, DisplayFace);
+        Key = Make(12, FW_SEMIBOLD, TextFace);
+        KeySymbol = Make(13, FW_NORMAL, "Segoe UI Symbol");
     }
 
     public IntPtr Body { get; }
@@ -44,6 +46,10 @@ internal sealed unsafe class Fonts
     public IntPtr Title { get; }
     public IntPtr Heading { get; }
     public IntPtr Subheading { get; }
+
+    /// <summary>Text on a keycap, and the ⌘ symbol beside it.</summary>
+    public IntPtr Key { get; }
+    public IntPtr KeySymbol { get; }
 
     /// <summary>Deletes the fonts, once the window using them is gone.</summary>
     public void Delete()
