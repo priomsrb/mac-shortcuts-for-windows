@@ -2,7 +2,7 @@
 
 **Website:** https://priomsrb.github.io/mac-shortcuts-for-windows/
 
-**[Download MacShortcuts.exe](https://github.com/priomsrb/mac-shortcuts-for-windows/releases/latest/download/MacShortcuts.exe)** (single file, no installer) · [All releases](https://github.com/priomsrb/mac-shortcuts-for-windows/releases)
+**[Download the latest release](https://github.com/priomsrb/mac-shortcuts-for-windows/releases/latest)** (single file, no installer) · [All releases](https://github.com/priomsrb/mac-shortcuts-for-windows/releases)
 
 Use macOS-style keyboard shortcuts on Windows: the **Alt** key (where ⌘ Cmd sits on a Mac keyboard) acts as Cmd, so **Alt+C** copies, **Alt+V** pastes, **Alt+Tab** still switches apps, and so on.
 
