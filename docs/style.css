@@ -268,6 +268,37 @@ h1 { font-size: clamp(40px, 5.4vw, 64px); font-weight: 700; letter-spacing: -0.0
 @media (max-width: 980px) { .sc-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .sc-grid { grid-template-columns: 1fr; } }
 
+/* ---------- Full shortcut list ---------- */
+.all { margin-top: 32px; }
+.more { margin-top: 24px; text-align: center; color: var(--muted); font-size: 16px; }
+.more a { font-weight: 600; }
+.all summary {
+  list-style: none; cursor: pointer; width: fit-content; margin: 0 auto; padding: 12px 22px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow); font-weight: 600; color: var(--accent);
+}
+.all summary::-webkit-details-marker { display: none; }
+.all summary:hover { text-decoration: underline; }
+.all .all-close, .all[open] .all-open { display: none; }
+.all[open] .all-close { display: inline; }
+.all-body { margin-top: 28px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px 28px 12px; }
+.all-note { color: var(--muted); font-size: 15px; margin-bottom: 12px; }
+.all-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.all-table thead th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.all-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.all-table td:nth-child(1) { white-space: nowrap; width: 1%; }
+.all-table td:nth-child(2) { color: var(--muted); }
+.all-table .cat th { text-align: left; font-family: var(--font-display); font-size: 17px; font-weight: 650; padding: 28px 12px 8px; border-bottom: 1px solid var(--border); }
+.all-table .cat th span { margin-left: 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.all-table tbody:last-child tr:last-child td { border-bottom: 0; }
+@media (max-width: 760px) {
+  .all-body { padding: 18px 16px 8px; }
+  .all-table thead { display: none; }
+  .all-table tr:not(.cat) { display: block; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .all-table td { display: block; padding: 2px 4px; border: 0; width: auto !important; white-space: normal !important; }
+  .all-table td:nth-child(2)::before { content: "Sends "; opacity: 0.7; }
+  .all-table .cat th { display: block; padding: 22px 4px 8px; }
+}
+
 /* ---------- Features ---------- */
 .feat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .feat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 22px; box-shadow: var(--shadow); }

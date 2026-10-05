@@ -1,4 +1,10 @@
 (() => {
+  // ---------- Full shortcut list ----------
+  const all = document.getElementById("all-shortcuts");
+  const openAll = () => { if (location.hash === "#all-shortcuts") { all.open = true; all.scrollIntoView(); } };
+  addEventListener("hashchange", openAll);
+  openAll();
+
   // ---------- Screenshot tour ----------
   const shots = {
     shortcuts: {
