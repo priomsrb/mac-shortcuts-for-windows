@@ -192,12 +192,15 @@ internal sealed unsafe partial class MainWindow
             case CDDS_ITEMPOSTPAINT:
                 var bounds = _shortcutList.GetItemRect((int)cd->nmcd.dwItemSpec);
                 // The Explorer theme draws lines between the columns; the design has none.
-                uint back = _shortcutList.IsSelected((int)cd->nmcd.dwItemSpec) ? _palette.Selection : _palette.Surface;
+                // The theme's selection and hover highlight has no gaps, so the lines are covered
+                // with the row's own background, copied from just left of each one.
                 int x = bounds.left;
+                int lineWidth = Scale(4), rowHeight = bounds.bottom - bounds.top;
                 for (int column = 0; column < 2; column++)
                 {
                     x += _shortcutList.GetColumnWidth(column);
-                    Paint.Fill(cd->nmcd.hdc, Paint.Rect(x - Scale(2), bounds.top, Scale(4), bounds.bottom - bounds.top), back);
+                    StretchBlt(cd->nmcd.hdc, x - lineWidth / 2, bounds.top, lineWidth, rowHeight,
+                        cd->nmcd.hdc, x - lineWidth / 2 - 1, bounds.top, 1, rowHeight, SRCCOPY);
                 }
                 Paint.HorizontalLine(cd->nmcd.hdc, bounds.left, bounds.right, bounds.bottom - 1, _palette.Divider);
                 return CDRF_DODEFAULT;
