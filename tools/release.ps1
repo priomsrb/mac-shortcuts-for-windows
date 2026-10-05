@@ -100,9 +100,10 @@ if ((Ask 'Edit the release notes before continuing?' @('Yes, open them in an edi
     $tmp = Join-Path ([IO.Path]::GetTempPath()) "release-notes-$newVersion.md"
     [IO.File]::WriteAllText($tmp, "$notes`n", $utf8)
     $editor = if ($env:EDITOR) { $env:EDITOR } else { 'notepad' }
-    Write-Host "Opening $editor. Save and close it to continue."
-    & $editor $tmp
-    if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { Write-Host "(editor exited with code $LASTEXITCODE)" }
+    # Don't wait on the editor process: Windows 11 Notepad hands the file to its running
+    # instance and exits at once, so wait for the user instead.
+    Start-Process $editor -ArgumentList "`"$tmp`""
+    [void](Read-Host "Opened in $editor. Save the file, then press Enter here to continue")
     $notes = ([IO.File]::ReadAllText($tmp) -replace "`r`n", "`n").Trim()
     Remove-Item $tmp -ErrorAction SilentlyContinue
 }
