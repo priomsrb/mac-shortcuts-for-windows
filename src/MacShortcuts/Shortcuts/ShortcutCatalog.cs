@@ -90,8 +90,9 @@ public static class ShortcutCatalog
         Same("tab.new", Browser, Keys.T, "New tab");
         Same("tab.close", Browser, Keys.W, "Close tab / window");
         Same("tab.reopen", Browser, Keys.T, "Reopen closed tab", shift: true);
-        Add("tab.number", Browser, "Alt+1 … Alt+9, Alt+0", "Ctrl+1 … Ctrl+9, Ctrl+0", "Go to tab 1–8 / last tab (Alt+0 resets zoom)",
-            Enumerable.Range(0, 10).Select(i => Map(Keys.D0 + i, false, new Chord(Keys.D0 + i, Mods.Ctrl))).ToArray());
+        Add("tab.number", Browser, "Alt+1 … Alt+9", "Ctrl+1 … Ctrl+9", "Go to tab 1–8 / last tab",
+            Enumerable.Range(1, 9).Select(i => Map(Keys.D0 + i, false, new Chord(Keys.D0 + i, Mods.Ctrl))).ToArray());
+        Same("tab.zoomReset", Browser, Keys.D0, "Reset zoom");
         Add("tab.prevNext", Browser, "Alt+{ / Alt+}", "Ctrl+PgUp / Ctrl+PgDn", "Previous / next tab",
             [Map(Keys.OemOpenBrackets, true, new Chord(Keys.PageUp, Mods.Ctrl)), Map(Keys.OemCloseBrackets, true, new Chord(Keys.PageDown, Mods.Ctrl))]);
         Add("browser.backForward", Browser, "Alt+[ / Alt+]", "Browser Back / Forward", "Go back / forward",
@@ -120,8 +121,10 @@ public static class ShortcutCatalog
             [new Binding(new Trigger(Keys.H, false), new MinimizeWindowAction())]);
         Add("win.prefs", Window, "Alt+,", "Ctrl+,", "Preferences (apps that support Ctrl+,)",
             [Map(Keys.Oemcomma, false, new Chord(Keys.Oemcomma, Mods.Ctrl))]);
-        Add("win.screenshot", Window, "Alt+Shift+3 / Alt+Shift+4", "Win+PrtScn / Win+Shift+S", "Screenshot full screen / region",
-            [Map(Keys.D3, true, new Chord(Keys.PrintScreen, Mods.Win)), Map(Keys.D4, true, new Chord(Keys.S, Mods.Win | Mods.Shift))]);
+        Add("win.screenshot", Window, "Alt+Shift+3", "Win+PrtScn", "Screenshot full screen",
+            [Map(Keys.D3, true, new Chord(Keys.PrintScreen, Mods.Win))]);
+        Add("win.screenshotRegion", Window, "Alt+Shift+4", "Win+Shift+S", "Screenshot region",
+            [Map(Keys.D4, true, new Chord(Keys.S, Mods.Win | Mods.Shift))]);
         Add("win.search", Window, "Alt+Space", "Win+S", "Spotlight → Windows Search (overrides Alt+Space window menu / PowerToys)",
             [Map(Keys.Space, false, new Chord(Keys.S, Mods.Win))], on: false);
 
