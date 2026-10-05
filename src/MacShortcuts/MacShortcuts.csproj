@@ -9,7 +9,7 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <!-- Common Controls v6 (visual styles, ListView groups) and per-monitor DPI awareness. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>Mac Shortcuts for Windows</Product>
   </PropertyGroup>
 

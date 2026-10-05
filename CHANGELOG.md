@@ -6,6 +6,12 @@ Add user-facing changes under **Unreleased** as you go. `tools/release.ps1` move
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-05
+
+\- Improve styling
+
+\- Fix some visual bugs
+
 ## [1.0.0]
 
 Initial release.
