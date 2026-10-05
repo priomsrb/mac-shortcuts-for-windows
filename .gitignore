@@ -3,3 +3,4 @@ obj/
 publish/
 .vs/
 *.user
+.claude/settings.local.json
