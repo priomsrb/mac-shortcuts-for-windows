@@ -93,7 +93,7 @@ internal sealed unsafe partial class MainWindow
             var shortcut = catalog[i];
             if (!all && shortcut.Category != category) continue;
             if (filter.Length > 0 && !Matches(shortcut, filter)) continue;
-            int row = _shortcutList.AddItem(Array.IndexOf(Categories, shortcut.Category), shortcut.TriggerText, shortcut.SendsText, shortcut.Description);
+            int row = _shortcutList.AddItem(Array.IndexOf(Categories, shortcut.Category), "", "", shortcut.Description); // the keycaps are drawn from the catalog
             _shortcutList.SetChecked(row, _settings.IsEnabled(shortcut));
             _rows.Add(i);
         }
@@ -212,14 +212,7 @@ internal sealed unsafe partial class MainWindow
         return CDRF_DODEFAULT;
     }
 
-    /// <summary>The colour at a point in a row, or the list's own background if it can't be read.</summary>
-    uint RowBackground(IntPtr hdc, int x, int y)
-    {
-        uint color = GetPixel(hdc, x, y);
-        return color == 0xFFFFFFFF ? _palette.Surface : color;
-    }
-
-    /// <summary>Replaces the key columns' text with keycaps.</summary>
+    /// <summary>Draws the key columns as keycaps; their list text is empty.</summary>
     void DrawKeyCaps(IntPtr hdc, int row, RECT bounds)
     {
         if (row < 0 || row >= _rows.Count) return;
@@ -230,8 +223,6 @@ internal sealed unsafe partial class MainWindow
         {
             int right = bounds.left + (column == 0 ? 0 : _shortcutList.GetColumnWidth(0)) + _shortcutList.GetColumnWidth(column);
             var cell = new RECT { left = left, top = bounds.top + 1, right = right - padding, bottom = bounds.bottom - 1 };
-            // Covers the text with the row's own background (selection, hover), sampled from the cell's empty right edge.
-            Paint.Fill(hdc, cell with { right = right }, RowBackground(hdc, right - 2, (bounds.top + bounds.bottom) / 2));
             KeyCaps.Draw(hdc, cell, column == 0 ? shortcut.TriggerText : shortcut.SendsText, column == 0,
                 _palette, _fonts.Key, _fonts.KeySymbol, _dpi);
             left = right;
