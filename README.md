@@ -57,6 +57,10 @@ A low-level keyboard hook (`WH_KEYBOARD_LL`) runs on a dedicated thread. Alt key
 - `tools/smoke-test.ps1`: with the app running, opens a test window and simulates shortcuts to verify the remapping end to end.
 - `tools/generate-icon.ps1`: regenerates `src/MacShortcuts/app.ico`.
 
+## Built with AI
+
+This app was written with [Claude Code](https://claude.com/claude-code). The source is open, so you can read exactly what it does.
+
 ## License
 
 [MIT](LICENSE)
