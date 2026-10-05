@@ -51,6 +51,9 @@ internal sealed unsafe class ListView
     /// </summary>
     public int CheckBoxPadding { get; set; }
 
+    /// <summary>Pixels of empty space after each checkbox, inside its image. Takes effect in <see cref="DrawCheckBoxes"/>.</summary>
+    public int CheckBoxGap { get; set; }
+
     public IntPtr Header => SendMessage(Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
 
     public int Count => (int)SendMessage(Handle, LVM_GETITEMCOUNT, IntPtr.Zero, IntPtr.Zero);
@@ -207,10 +210,11 @@ internal sealed unsafe class ListView
         ImageList_GetIconSize(images, out int width, out int height);
         // The images are square until padded; resizing the list clears it, so the glyphs are drawn again.
         int padding = CheckBoxPadding;
-        if (width != height + padding)
+        int extra = padding + CheckBoxGap;
+        if (width != height + extra)
         {
             // The list only takes a new image size from a new image list.
-            width = height + padding;
+            width = height + extra;
             IntPtr old = SendMessage(Handle, LVM_SETIMAGELIST, LVSIL_STATE, ImageList_Create(width, height, ILC_COLOR32, 2, 0));
             if (old != IntPtr.Zero && old != images) ImageList_Destroy(old);
             images = SendMessage(Handle, LVM_GETIMAGELIST, LVSIL_STATE, IntPtr.Zero);
