@@ -4,6 +4,8 @@ Use macOS-style keyboard shortcuts on Windows: the **Alt** key (where ⌘ Cmd si
 
 A tray app with a settings window where every shortcut can be switched on or off.
 
+**Website:** https://priomsrb.github.io/mac-shortcuts-for-windows/
+
 ## Build & run
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
@@ -45,3 +47,7 @@ A low-level keyboard hook (`WH_KEYBOARD_LL`) runs on a dedicated thread. Alt key
 - `dotnet test`: unit tests for the remapping logic, shortcut catalog and settings.
 - `tools/smoke-test.ps1`: with the app running, opens a test window and simulates shortcuts to verify the remapping end to end.
 - `tools/generate-icon.ps1`: regenerates `src/MacShortcuts/app.ico`.
+
+## License
+
+[MIT](LICENSE)
