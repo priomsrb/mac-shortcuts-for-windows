@@ -6,6 +6,15 @@ A tray app with a settings window where every shortcut can be switched on or off
 
 **Website:** https://priomsrb.github.io/mac-shortcuts-for-windows/
 
+**[Download MacShortcuts.exe](https://github.com/priomsrb/mac-shortcuts-for-windows/releases/latest/download/MacShortcuts.exe)** (single file, no installer) · [All releases](https://github.com/priomsrb/mac-shortcuts-for-windows/releases)
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/shortcuts-dark.png">
+    <img src="docs/images/shortcuts-light.png" alt="The Mac Shortcuts for Windows settings window, listing shortcuts by category" width="720">
+  </picture>
+</p>
+
 ## Build & run
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
