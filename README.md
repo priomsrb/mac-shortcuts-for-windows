@@ -1,12 +1,13 @@
 # Mac Shortcuts for Windows
 
+**Website:** https://priomsrb.github.io/mac-shortcuts-for-windows/
+
+**[Download MacShortcuts.exe](https://github.com/priomsrb/mac-shortcuts-for-windows/releases/latest/download/MacShortcuts.exe)** (single file, no installer) · [All releases](https://github.com/priomsrb/mac-shortcuts-for-windows/releases)
+
 Use macOS-style keyboard shortcuts on Windows: the **Alt** key (where ⌘ Cmd sits on a Mac keyboard) acts as Cmd, so **Alt+C** copies, **Alt+V** pastes, **Alt+Tab** still switches apps, and so on.
 
 A tray app with a settings window where every shortcut can be switched on or off.
 
-**Website:** https://priomsrb.github.io/mac-shortcuts-for-windows/
-
-**[Download MacShortcuts.exe](https://github.com/priomsrb/mac-shortcuts-for-windows/releases/latest/download/MacShortcuts.exe)** (single file, no installer) · [All releases](https://github.com/priomsrb/mac-shortcuts-for-windows/releases)
 
 <p align="center">
   <picture>
@@ -15,21 +16,17 @@ A tray app with a settings window where every shortcut can be switched on or off
   </picture>
 </p>
 
-## Build & run
+Please [raise](https://github.com/priomsrb/mac-shortcuts-for-windows/issues) an issue if you want more features, additional hotkeys, or to report bugs.
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+## Motivation
 
-```bash
-dotnet run --project src/MacShortcuts
-```
+MacOS and windows use different keys for shortcuts. When switching between them, it can be confusing for your muscle memory. By having the same shortcuts in both OSes you can avoid this problem.
 
-Standalone `.exe` (a ~2.5 MB native binary; no .NET install needed on the target machine):
+Prior to this app, I was using AutoHotkey to set this up. But it had some downsides:
 
-```bash
-dotnet publish src/MacShortcuts -c Release -r win-x64 -o publish
-```
-
-This uses [Native AOT](https://learn.microsoft.com/dotnet/core/deploying/native-aot/), which also needs the Visual Studio **Desktop development with C++** workload (or the C++ Build Tools) for the linker. With the VS 2019 Build Tools, run it from PowerShell or cmd with `%ProgramFiles(x86)%\Microsoft Visual Studio\Installer` on `PATH`; otherwise the linker lookup fails with "'vswhere.exe' is not recognized".
+- No UI
+- Difficult to configure
+- Needs to be turned off when playing certain games. Some games treat Autohotkey as a cheating software.
 
 ## Usage
 
@@ -51,6 +48,22 @@ This uses [Native AOT](https://learn.microsoft.com/dotnet/core/deploying/native-
 
 A low-level keyboard hook (`WH_KEYBOARD_LL`) runs on a dedicated thread. Alt key-downs pass through untouched so unmapped combos keep working. When a mapped key is pressed, the key is swallowed, Alt is released logically (after tapping an unassigned "mask" key so the menu bar doesn't activate), and the replacement keys are injected with `SendInput`. The decision logic is in [RemapEngine.cs](src/MacShortcuts/Remapping/RemapEngine.cs), separate from the Windows hooks so it can be unit tested.
 
+## Build & run
+
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+
+```bash
+dotnet run --project src/MacShortcuts
+```
+
+Standalone `.exe` (a ~2.5 MB native binary; no .NET install needed on the target machine):
+
+```bash
+dotnet publish src/MacShortcuts -c Release -r win-x64 -o publish
+```
+
+This uses [Native AOT](https://learn.microsoft.com/dotnet/core/deploying/native-aot/), which also needs the Visual Studio **Desktop development with C++** workload (or the C++ Build Tools) for the linker. With the VS 2019 Build Tools, run it from PowerShell or cmd with `%ProgramFiles(x86)%\Microsoft Visual Studio\Installer` on `PATH`; otherwise the linker lookup fails with "'vswhere.exe' is not recognized".
+
 ## Development
 
 - `dotnet test`: unit tests for the remapping logic, shortcut catalog and settings.
@@ -59,7 +72,9 @@ A low-level keyboard hook (`WH_KEYBOARD_LL`) runs on a dedicated thread. Alt key
 
 ## Built with AI
 
-This app was written with [Claude Code](https://claude.com/claude-code). The source is open, so you can read exactly what it does.
+This app was written with [Claude Code](https://claude.com/claude-code). I don't have much experience building windows apps so it would've been difficult to make this myself.
+
+Feel free to contribute code or fork this project for your own use.
 
 ## License
 
