@@ -1,4 +1,4 @@
-using MacShortcuts.Interop;
+﻿using MacShortcuts.Interop;
 using MacShortcuts.Settings;
 using Microsoft.Win32;
 
@@ -62,6 +62,7 @@ internal sealed record Palette
     public required uint KeyText { get; init; }
     public required uint KeyCmdFace { get; init; }
     public required uint KeyCmdEdge { get; init; }
+    public required uint KeyCmdText { get; init; }
 
     public static Palette Light { get; } = new()
     {
@@ -93,6 +94,7 @@ internal sealed record Palette
         KeyText = Hex(0x22211F),
         KeyCmdFace = Hex(0xDDEAE5),
         KeyCmdEdge = Hex(0x93B5A9),
+        KeyCmdText = Hex(0x2F5D50),
     };
 
     public static Palette Dark { get; } = new()
@@ -125,9 +127,54 @@ internal sealed record Palette
         KeyText = Hex(0xECEBE8),
         KeyCmdFace = Hex(0x35504A),
         KeyCmdEdge = Hex(0x1A2925),
+        KeyCmdText = Hex(0x7FB8A4),
     };
 
-    public static Palette For(bool dark) => dark ? Dark : Light;
+    /// <summary>The base palette with every accent-derived colour taken from the Windows accent colour.</summary>
+    public static Palette For(bool dark)
+    {
+        uint accent = Theming.SystemAccent;
+        const uint white = 0xFFFFFF;
+        if (dark)
+        {
+            // Keep the accent bright enough to read on the dark surfaces.
+            uint a = Luminance(accent) < 0.35 ? Mix(accent, white, 0.35) : accent;
+            return Dark with
+            {
+                Accent = Hex(a),
+                OnAccent = Hex(Luminance(a) > 0.5 ? 0x1C1B1A : white),
+                Selection = Hex(Mix(a, 0x262523, 0.18)),
+                SelectionText = Hex(Mix(a, white, 0.45)),
+                RailSelectedText = Hex(Mix(a, white, 0.65)),
+                KeyCmdFace = Hex(Mix(a, 0x3A3835, 0.12)),
+                KeyCmdEdge = Hex(Mix(a, 0x1A1918, 0.2)),
+                KeyCmdText = Hex(Mix(a, 0xECEBE8, 0.45)),
+            };
+        }
+        // Keep the accent dark enough for white text on top of it.
+        uint l = Luminance(accent) > 0.4 ? Mix(accent, 0x000000, 0.35) : accent;
+        return Light with
+        {
+            Accent = Hex(l),
+            Selection = Hex(Mix(l, white, 0.12)),
+            SelectionText = Hex(Mix(l, 0x000000, 0.4)),
+            RailSelectedText = Hex(Mix(l, 0x000000, 0.4)),
+            KeyCmdFace = Hex(Mix(l, 0xF3F1ED, 0.08)),
+            KeyCmdEdge = Hex(Mix(l, 0xBDB9B1, 0.25)),
+            KeyCmdText = Hex(Mix(l, 0x22211F, 0.65)),
+        };
+    }
+
+    /// <summary>Blends 0xRRGGBB <paramref name="from"/> towards <paramref name="to"/>; <paramref name="amount"/> is how much of <paramref name="from"/> remains.</summary>
+    static uint Mix(uint from, uint to, double amount)
+    {
+        uint Channel(int shift) => (uint)Math.Round(((from >> shift) & 0xFF) * amount + ((to >> shift) & 0xFF) * (1 - amount));
+        return Channel(16) << 16 | Channel(8) << 8 | Channel(0);
+    }
+
+    /// <summary>Approximate perceived brightness, 0 to 1.</summary>
+    static double Luminance(uint rgb) =>
+        (0.2126 * ((rgb >> 16) & 0xFF) + 0.7152 * ((rgb >> 8) & 0xFF) + 0.0722 * (rgb & 0xFF)) / 255;
 
     /// <summary>A COLORREF from 0xRRGGBB.</summary>
     static uint Hex(uint rgb) => Gdi32.Rgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
@@ -144,6 +191,22 @@ internal static class Theming
         {
             using var key = Registry.CurrentUser.OpenSubKey(PersonalizeKey);
             return key?.GetValue("AppsUseLightTheme") is int light && light == 0;
+        }
+    }
+
+    /// <summary>The Windows accent colour as 0xRRGGBB, falling back to the previous teal.</summary>
+    public static uint SystemAccent
+    {
+        get
+        {
+            // The colour picked in Settings > Personalization > Colors, stored as 0xAABBGGRR.
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent");
+            if (key?.GetValue("AccentColorMenu") is int abgr)
+            {
+                uint v = (uint)abgr;
+                return (v & 0xFF) << 16 | (v & 0xFF00) | (v >> 16) & 0xFF;
+            }
+            return 0x2F5D50;
         }
     }
 

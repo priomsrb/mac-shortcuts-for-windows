@@ -67,7 +67,7 @@ internal static partial class KeyCaps
 
             uint face = isCmd ? palette.KeyCmdFace : palette.KeyFace;
             uint edge = isCmd ? palette.KeyCmdEdge : palette.KeyEdge;
-            uint ink = isCmd ? palette.Accent : palette.KeyText;
+            uint ink = isCmd ? palette.KeyCmdText : palette.KeyText;
             Canvas.Render(hdc, bounds, null, c =>
             {
                 c.FillRoundRect(0, lift, width, capHeight - lift, radius, edge);
