@@ -259,7 +259,6 @@ h1 { font-size: clamp(40px, 5.4vw, 64px); font-weight: 700; letter-spacing: -0.0
 .combo .key { font-size: 13px; min-width: 2.2em; height: 2.2em; padding: 0 0.55em; border-radius: 7px; }
 .combo .key-cmd { padding-left: 1.5em; }
 .plus { color: var(--muted); }
-.mouse { font-size: 13px; font-weight: 600; color: var(--text); padding: 0.3em 0.6em; border-radius: 7px; border: 1px dashed var(--border); }
 .badge {
   font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
   color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 12%, transparent);
