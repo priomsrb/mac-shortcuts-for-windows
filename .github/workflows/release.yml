@@ -1,0 +1,54 @@
+name: Release
+
+# Started by tools/release.ps1, which bumps the version, rolls CHANGELOG.md and pushes the tag.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Check the tag matches the project version
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content src/MacShortcuts/MacShortcuts.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match <Version>$version</Version> in the csproj." }
+
+      - name: Test
+        run: dotnet test -c Release
+
+      - name: Publish
+        run: dotnet publish src/MacShortcuts -c Release -r win-x64 -o publish
+
+      - name: Name the asset and checksum it
+        shell: pwsh
+        run: |
+          $name = "MacShortcuts-$env:GITHUB_REF_NAME-win-x64.exe"
+          Move-Item publish/MacShortcuts.exe $name
+          $hash = (Get-FileHash $name -Algorithm SHA256).Hash.ToLower()
+          "$hash  $name" | Out-File "$name.sha256" -Encoding ascii
+          "ASSET=$name" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Extract this version's changelog section
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $text = (Get-Content CHANGELOG.md -Raw) -replace "`r`n", "`n"
+          if ($text -notmatch "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n(.*?)(?=^## \[|\z)") { throw "No section for $version in CHANGELOG.md" }
+          $Matches[1].Trim() | Out-File release-notes.md -Encoding utf8
+
+      - name: Create the GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create $env:GITHUB_REF_NAME $env:ASSET "$env:ASSET.sha256" --title $env:GITHUB_REF_NAME --notes-file release-notes.md

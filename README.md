@@ -70,6 +70,16 @@ This uses [Native AOT](https://learn.microsoft.com/dotnet/core/deploying/native-
 - `tools/smoke-test.ps1`: with the app running, opens a test window and simulates shortcuts to verify the remapping end to end.
 - `tools/generate-icon.ps1`: regenerates `src/MacShortcuts/app.ico`.
 
+## Releasing
+
+Add user-facing changes to the `Unreleased` section of `CHANGELOG.md` as you go (or leave it empty to pre-fill from commit subjects), then run:
+
+```bash
+pwsh tools/release.ps1
+```
+
+It asks for the version bump, lets you edit the release notes, and offers a dry run before doing anything. The real run bumps `<Version>` in the csproj, rolls the changelog, commits, tags `vX.Y.Z` and pushes. The tag starts `.github/workflows/release.yml`, which tests, builds the exe and creates the GitHub release with it attached.
+
 ## Built with AI
 
 This app was written with [Claude Code](https://claude.com/claude-code). I don't have much experience building windows apps so it would've been difficult to make this myself.
