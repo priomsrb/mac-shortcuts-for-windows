@@ -18,6 +18,9 @@ public sealed class AppSettings
     public bool UseRightAlt { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.System;
 
+    /// <summary>Don't remap keys that other software (e.g. PowerToys) injects rather than the physical keyboard.</summary>
+    public bool IgnoreInjectedKeys { get; set; } = true;
+
     /// <summary>Only shortcuts the user has toggled are stored; the rest use their defaults.</summary>
     public Dictionary<string, bool> Shortcuts { get; set; } = [];
 
@@ -83,7 +86,7 @@ public sealed class AppSettings
         bool ctrlClick = IsEnabled(ShortcutCatalog.CtrlClick);
         bool ctrlScroll = IsEnabled(ShortcutCatalog.CtrlScroll);
 
-        return new RemapConfig(Enabled, UseLeftAlt, UseRightAlt, ctrlClick, ctrlScroll, map, excluded);
+        return new RemapConfig(Enabled, UseLeftAlt, UseRightAlt, ctrlClick, ctrlScroll, map, excluded, IgnoreInjectedKeys);
     }
 }
 

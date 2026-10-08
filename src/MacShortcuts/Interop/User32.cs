@@ -146,6 +146,7 @@ internal static unsafe partial class User32
     public const uint MB_ICONWARNING = 0x30;
 
     public const uint LLKHF_EXTENDED = 0x01;
+    public const uint LLKHF_INJECTED = 0x10;
     public const uint LLKHF_UP = 0x80;
 
     public const uint INPUT_MOUSE = 0;

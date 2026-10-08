@@ -74,7 +74,11 @@ internal sealed class RemapEngine(IInputSystem system)
 
         ReconcileModifiers();
         var cfg = _config;
-        if (cfg.Enabled && AltAsCmd(cfg) && !Ctrl && !Win
+        // Keys injected by other tools (e.g. PowerToys turning Win+1 into Win+Shift+Left) can be left alone,
+        // so their output isn't remapped a second time.
+        bool remappable = !(cfg.IgnoreInjectedKeys && k.Injected);
+
+        if (cfg.Enabled && remappable && AltAsCmd(cfg) && !Ctrl && !Win
             && cfg.Map.TryGetValue(new Trigger((Keys)k.Vk, Shift), out var action)
             && !IsExcluded(cfg, system.GetForegroundProcessName))
         {
@@ -83,7 +87,7 @@ internal sealed class RemapEngine(IInputSystem system)
             return true;
         }
 
-        if (cfg.Enabled && !_lAlt && !_rAlt && Ctrl != Win
+        if (cfg.Enabled && remappable && !_lAlt && !_rAlt && Ctrl != Win
             && cfg.Map.TryGetValue(new Trigger((Keys)k.Vk, Shift, Ctrl ? Mods.Ctrl : Mods.Win), out var viaAction)
             && !IsExcluded(cfg, system.GetForegroundProcessName))
         {

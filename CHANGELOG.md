@@ -6,6 +6,8 @@ Add user-facing changes under **Unreleased** as you go. `tools/release.ps1` move
 
 ## [Unreleased]
 
+\- Add an "Ignore keys from other apps" setting (on by default) so shortcuts aren't applied to keys sent by other tools such as PowerToys
+
 ## [1.1.0] - 2026-10-05
 
 \- Improve styling

@@ -39,7 +39,7 @@ public sealed class KeyRemapper : IDisposable
     bool OnKey(in KBDLLHOOKSTRUCT k) =>
         k.dwExtraInfo != WindowsInputSystem.Signature
         && _engine.OnKey(new KeyEvent((int)k.vkCode, Up: (k.flags & LLKHF_UP) != 0,
-            k.scanCode, Extended: (k.flags & LLKHF_EXTENDED) != 0));
+            k.scanCode, Extended: (k.flags & LLKHF_EXTENDED) != 0, Injected: (k.flags & LLKHF_INJECTED) != 0));
 
     bool OnMouse(IntPtr message, in MSLLHOOKSTRUCT m)
     {

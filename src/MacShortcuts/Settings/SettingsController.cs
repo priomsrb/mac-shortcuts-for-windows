@@ -15,6 +15,7 @@ internal sealed class SettingsController(AppSettings settings, Action<AppSetting
     public bool Enabled => settings.Enabled;
     public bool UseLeftAlt => settings.UseLeftAlt;
     public bool UseRightAlt => settings.UseRightAlt;
+    public bool IgnoreInjectedKeys => settings.IgnoreInjectedKeys;
     public AppTheme Theme => settings.Theme;
     public IReadOnlyList<string> ExcludedApps => settings.ExcludedApps;
 
@@ -27,6 +28,8 @@ internal sealed class SettingsController(AppSettings settings, Action<AppSetting
     public void SetUseLeftAlt(bool use) => Change(() => settings.UseLeftAlt = use);
 
     public void SetUseRightAlt(bool use) => Change(() => settings.UseRightAlt = use);
+
+    public void SetIgnoreInjectedKeys(bool ignore) => Change(() => settings.IgnoreInjectedKeys = ignore);
 
     public void SetTheme(AppTheme theme) => Change(() => settings.Theme = theme);
 

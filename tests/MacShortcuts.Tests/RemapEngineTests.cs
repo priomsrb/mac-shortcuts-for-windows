@@ -335,15 +335,42 @@ public class RemapEngineTests
     }
 
     [Fact]
+    public void WinShiftLeft_InjectedByAnotherTool_IsLeftAloneWhenIgnoring()
+    {
+        Enable("nav.winSelectWord", ignoreInjected: true);
+        Press(VK_LWIN);
+        Press(VK_LSHIFT);
+        Assert.False(Press(new KeyEvent(Left, Up: false, Injected: true)));
+        AssertSent([]);
+    }
+
+    [Fact]
+    public void AltC_InjectedByAnotherTool_IsLeftAloneWhenIgnoring()
+    {
+        Configure(new AppSettings { IgnoreInjectedKeys = true });
+        Press(VK_LMENU);
+        Assert.False(Press(new KeyEvent(C, Up: false, Injected: true)));
+    }
+
+    [Fact]
+    public void WinShiftLeft_InjectedByAnotherTool_IsRemappedWhenNotIgnoring()
+    {
+        Enable("nav.winSelectWord", ignoreInjected: false);
+        Press(VK_LWIN);
+        Press(VK_LSHIFT);
+        Assert.True(Press(new KeyEvent(Left, Up: false, Injected: true)));
+    }
+
+    [Fact]
     public void AltDelete_SendsCtrlDelete()
     {
         Press(VK_LMENU);
         Assert.True(Press((int)Keys.Delete));
     }
 
-    void Enable(string id)
+    void Enable(string id, bool ignoreInjected = false)
     {
-        var settings = new AppSettings();
+        var settings = new AppSettings { IgnoreInjectedKeys = ignoreInjected };
         settings.Shortcuts[id] = true;
         Configure(settings);
     }
