@@ -1,4 +1,5 @@
 using MacShortcuts.Settings;
+using MacShortcuts.Shortcuts;
 
 namespace MacShortcuts.Tests;
 
@@ -25,6 +26,7 @@ public sealed class AppSettingsFileTests : IDisposable
     {
         var saved = new AppSettings { Enabled = false, Theme = AppTheme.Dark, ExcludedApps = ["mstsc.exe"] };
         saved.Shortcuts["edit.copy"] = false;
+        saved.CustomShortcuts.Add(CustomShortcut.From(new Chord(Keys.K, Mods.Alt | Mods.Shift), new Chord(Keys.Home, Mods.Ctrl)));
         saved.Save(SettingsPath);
 
         var loaded = AppSettings.Load(SettingsPath);
@@ -32,6 +34,8 @@ public sealed class AppSettingsFileTests : IDisposable
         Assert.Equal(AppTheme.Dark, loaded.Theme);
         Assert.Equal(["mstsc.exe"], loaded.ExcludedApps);
         Assert.False(loaded.Shortcuts["edit.copy"]);
+        var custom = Assert.Single(loaded.CustomShortcuts);
+        Assert.Equal(("Alt+Shift+K", "Ctrl+Home"), (custom.TriggerText, custom.SendsText));
     }
 
     [Fact]

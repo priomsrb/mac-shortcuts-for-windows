@@ -24,6 +24,9 @@ public sealed class AppSettings
     /// <summary>Only shortcuts the user has toggled are stored; the rest use their defaults.</summary>
     public Dictionary<string, bool> Shortcuts { get; set; } = [];
 
+    /// <summary>Shortcuts the user recorded. They take priority over the catalog's.</summary>
+    public List<CustomShortcut> CustomShortcuts { get; set; } = [];
+
     /// <summary>Process names (e.g. "mstsc.exe") where nothing is remapped.</summary>
     public List<string> ExcludedApps { get; set; } = [];
 
@@ -73,6 +76,8 @@ public sealed class AppSettings
     public RemapConfig ToConfig()
     {
         var map = new Dictionary<Trigger, ShortcutAction>();
+        foreach (var custom in CustomShortcuts.Where(c => c.Enabled && c.IsValid))
+            map.TryAdd(custom.Trigger, new SendKeysAction([custom.Sends]));
         foreach (var shortcut in ShortcutCatalog.All.Where(IsEnabled))
             foreach (var binding in shortcut.Bindings)
                 map.TryAdd(binding.Trigger, binding.Action);

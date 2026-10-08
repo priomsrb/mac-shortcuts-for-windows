@@ -194,7 +194,7 @@ internal sealed unsafe class TrayApp : Window, IDisposable
 
     MainWindow CreateWindow(WINDOWPLACEMENT? placement, MainWindow.Page page = MainWindow.Page.Shortcuts)
     {
-        var window = new MainWindow(_settings, _dark, placement, page);
+        var window = new MainWindow(_settings, _remapper.SetCapture, _dark, placement, page);
         window.HiddenToTray += (_, _) => ShowTrayHint();
         window.RestartAsAdminRequested += (_, _) => RestartAsAdmin();
         return window;

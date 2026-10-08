@@ -28,6 +28,7 @@ internal sealed class RemapEngine(IInputSystem system)
 
     volatile RemapConfig _config = RemapConfig.Disabled;
     volatile bool _resetRequested;
+    volatile Action<Chord>? _capture;
 
     // Everything below is only touched on the input thread.
     bool _lAlt, _rAlt;               // physically held
@@ -42,6 +43,13 @@ internal sealed class RemapEngine(IInputSystem system)
         _config = config;
         _resetRequested = true;
     }
+
+    /// <summary>
+    /// While set, every key that isn't a modifier is swallowed and reported with the modifiers held
+    /// instead of being remapped, so the user can record a shortcut. Pass null to stop.
+    /// <paramref name="onCaptured"/> is called on the input thread and must return quickly.
+    /// </summary>
+    public void SetCapture(Action<Chord>? onCaptured) => _capture = onCaptured;
 
     /// <summary>Forget tracked key state, e.g. after the session was locked and key-ups were missed.</summary>
     public void ResetKeyState() => _resetRequested = true;
@@ -73,25 +81,23 @@ internal sealed class RemapEngine(IInputSystem system)
         if (k.Up) return _swallowedKeyUps.Remove(k.Vk);
 
         ReconcileModifiers();
+        if (_capture is { } capture)
+        {
+            Capture(k, capture);
+            return true;
+        }
+
         var cfg = _config;
         // Keys injected by other tools (e.g. PowerToys turning Win+1 into Win+Shift+Left) can be left alone,
         // so their output isn't remapped a second time.
         bool remappable = !(cfg.IgnoreInjectedKeys && k.Injected);
 
-        if (cfg.Enabled && remappable && AltAsCmd(cfg) && !Ctrl && !Win
-            && cfg.Map.TryGetValue(new Trigger((Keys)k.Vk, Shift), out var action)
+        Mods via = HeldVia(cfg);
+        if (cfg.Enabled && remappable && via != Mods.None
+            && cfg.Map.TryGetValue(new Trigger((Keys)k.Vk, Shift, via), out var action)
             && !IsExcluded(cfg, system.GetForegroundProcessName))
         {
-            Execute(action);
-            _swallowedKeyUps.Add(k.Vk);
-            return true;
-        }
-
-        if (cfg.Enabled && remappable && !_lAlt && !_rAlt && Ctrl != Win
-            && cfg.Map.TryGetValue(new Trigger((Keys)k.Vk, Shift, Ctrl ? Mods.Ctrl : Mods.Win), out var viaAction)
-            && !IsExcluded(cfg, system.GetForegroundProcessName))
-        {
-            ExecuteWhileHeld(viaAction, Ctrl ? Mods.Ctrl : Mods.Win);
+            Execute(action, via);
             _swallowedKeyUps.Add(k.Vk);
             return true;
         }
@@ -179,15 +185,35 @@ internal sealed class RemapEngine(IInputSystem system)
         return true;
     }
 
-    void Execute(ShortcutAction action)
+    /// <summary>The Alt (as Cmd), Ctrl and Win keys held, which together with Shift select the shortcut.</summary>
+    Mods HeldVia(RemapConfig cfg)
+    {
+        bool alt = _lAlt || _rAlt;
+        // Alt that isn't acting as Cmd is a plain Alt: leave the combination alone.
+        if (alt && !AltAsCmd(cfg)) return Mods.None;
+        return (alt ? Mods.Alt : 0) | (Ctrl ? Mods.Ctrl : 0) | (Win ? Mods.Win : 0);
+    }
+
+    /// <summary>
+    /// Run a shortcut's action: Alt is released logically (the user keeps holding it), Ctrl and Win are lifted
+    /// for the replacement chords and pressed again so the user can keep holding them. Win is wrapped in
+    /// mask keys so releasing it doesn't open Start.
+    /// </summary>
+    void Execute(ShortcutAction action, Mods via)
     {
         var inputs = new List<SyntheticInput>();
         ReleaseAlt(inputs);
+        bool win = via.HasFlag(Mods.Win);
+        if (win)
+        {
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
+        }
 
+        bool winPressedAgain = false;
         if (action is SendKeysAction send)
         {
-            // Ctrl and Win are never held here (we don't remap when they are), so only Shift needs restoring.
-            Mods held = Shift ? Mods.Shift : Mods.None;
+            Mods held = (via & (Mods.Ctrl | Mods.Win)) | (Shift ? Mods.Shift : Mods.None);
             Mods current = held;
             foreach (var chord in send.Chords)
             {
@@ -195,7 +221,16 @@ internal sealed class RemapEngine(IInputSystem system)
                 inputs.Add(new SyntheticInput.Key((int)chord.Key, Up: false));
                 inputs.Add(new SyntheticInput.Key((int)chord.Key, Up: true));
             }
+            winPressedAgain = win && !current.HasFlag(Mods.Win);
             SetMods(inputs, ref current, held);
+        }
+
+        // Releasing a Win that was pressed last opens Start. A tap of the mask key prevents that, but only
+        // when needed: after a Win+key chord it would cancel the hotkey (e.g. snapping with Win+Left).
+        if (winPressedAgain)
+        {
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
         }
 
         system.Send(inputs);
@@ -204,42 +239,22 @@ internal sealed class RemapEngine(IInputSystem system)
             system.MinimizeForegroundWindow();
     }
 
-    /// <summary>
-    /// Run a Ctrl- or Win-triggered action: lift the modifier, send the replacement, then press it again
-    /// so the user can keep holding it. Win is followed by a mask key so releasing it doesn't open Start.
-    /// </summary>
-    void ExecuteWhileHeld(ShortcutAction action, Mods via)
+    void Capture(KeyEvent k, Action<Chord> onCaptured)
     {
+        Mods mods = (Shift ? Mods.Shift : 0) | (Ctrl ? Mods.Ctrl : 0) | (Win ? Mods.Win : 0) | (_lAlt || _rAlt ? Mods.Alt : 0);
+
+        // As for a shortcut, make sure releasing Alt or Win afterwards doesn't open the menu bar or Start.
         var inputs = new List<SyntheticInput>();
-        if (via == Mods.Win)
+        ReleaseAlt(inputs);
+        if (Win)
         {
             inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
             inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
         }
+        if (inputs.Count > 0) system.Send(inputs);
 
-        if (action is SendKeysAction send)
-        {
-            Mods held = via | (Shift ? Mods.Shift : Mods.None);
-            Mods current = held;
-            foreach (var chord in send.Chords)
-            {
-                SetMods(inputs, ref current, chord.Mods);
-                inputs.Add(new SyntheticInput.Key((int)chord.Key, Up: false));
-                inputs.Add(new SyntheticInput.Key((int)chord.Key, Up: true));
-            }
-            SetMods(inputs, ref current, held);
-        }
-
-        if (via == Mods.Win)
-        {
-            inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
-            inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
-        }
-
-        system.Send(inputs);
-
-        if (action is MinimizeWindowAction)
-            system.MinimizeForegroundWindow();
+        _swallowedKeyUps.Add(k.Vk);
+        onCaptured(new Chord((Keys)k.Vk, mods));
     }
 
     /// <summary>Release Alt in Windows' eyes while the user keeps holding it.</summary>

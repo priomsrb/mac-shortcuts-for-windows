@@ -1,3 +1,4 @@
+using MacShortcuts.Shortcuts;
 using static MacShortcuts.Interop.User32;
 
 namespace MacShortcuts.Remapping;
@@ -26,6 +27,9 @@ public sealed class KeyRemapper : IDisposable
         _engine.Update(config);
         _system.ClearProcessNames();
     }
+
+    /// <inheritdoc cref="RemapEngine.SetCapture"/>
+    public void SetCapture(Action<Chord>? onCaptured) => _engine.SetCapture(onCaptured);
 
     /// <inheritdoc cref="RemapEngine.ResetKeyState"/>
     public void ResetKeyState()

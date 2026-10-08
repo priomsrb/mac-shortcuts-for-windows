@@ -31,8 +31,9 @@ Prior to this app, I was using AutoHotkey to set this up. But it had some downsi
 ## Usage
 
 - Left-click the tray icon to open the window; right-click for **Settings**, **Enabled**, **Restart as administrator** and **Exit**.
-- The window's rail switches between three pages, with an on/off switch for all remapping at the bottom:
+- The window's rail switches between four pages, with an on/off switch for all remapping at the bottom:
   - **Shortcuts**: every shortcut by category, with a filter box. Tick or untick each one.
+  - **Custom**: record your own shortcuts. Click the first box and press the combination to remap (any mix of Alt, Ctrl and Win, optionally with Shift, plus a key), then the second box and press the keys to send instead, and click **Add**. Custom shortcuts take priority over built-in ones with the same keys.
   - **Excluded apps**: apps where nothing is remapped (e.g. `mstsc.exe`). Type a process name, pick a running app or browse for an `.exe`.
   - **Settings**: Start with Windows (launches minimized at sign-in), which Alt keys act as ⌘ Cmd, the theme (System follows Windows' light/dark app mode, including live changes) and restarting as administrator.
 - Closing the window keeps the app running in the tray.

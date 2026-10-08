@@ -12,6 +12,7 @@ internal static unsafe partial class User32
     public const int WM_CREATE = 0x0001;
     public const int WM_DESTROY = 0x0002;
     public const int WM_SIZE = 0x0005;
+    public const int WM_ACTIVATE = 0x0006;
     public const int WM_SETFOCUS = 0x0007;
     public const int WM_PAINT = 0x000F;
     public const int WM_CLOSE = 0x0010;
@@ -68,9 +69,11 @@ internal static unsafe partial class User32
     // Control styles and messages
     public const uint BS_PUSHBUTTON = 0x0;
     public const uint BS_AUTOCHECKBOX = 0x3;
+    public const uint BS_NOTIFY = 0x4000;
     public const int BM_GETCHECK = 0x00F0;
     public const int BM_SETCHECK = 0x00F1;
     public const int BN_CLICKED = 0;
+    public const int BN_KILLFOCUS = 7;
     public const int BST_CHECKED = 1;
 
     public const uint CBS_DROPDOWNLIST = 0x3;

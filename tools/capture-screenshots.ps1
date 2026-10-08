@@ -57,7 +57,7 @@ try {
         $crop = New-Object System.Drawing.Rectangle ($f.l - $r.l), ($f.t - $r.t), ($f.r - $f.l), ($f.b - $f.t)
 
         # Rail icon offsets from the window's top-left, in physical px at the scale the window opens at.
-        foreach ($page in @(@('shortcuts', 215), @('excluded', 325), @('settings', 437))) {
+        foreach ($page in @(@('shortcuts', 215), @('custom', 327), @('excluded', 439), @('settings', 551))) {
             Click ($r.l + 78) ($r.t + $page[1]); Start-Sleep -Milliseconds 700
             $bmp = New-Object System.Drawing.Bitmap ($r.r - $r.l), ($r.b - $r.t)
             $g = [System.Drawing.Graphics]::FromImage($bmp); $dc = $g.GetHdc()

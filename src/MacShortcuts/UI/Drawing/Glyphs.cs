@@ -1,6 +1,6 @@
 namespace MacShortcuts.UI.Drawing;
 
-internal enum Icon { Keyboard, Block, Wrench, Folder, Search }
+internal enum Icon { Keyboard, Plus, Block, Wrench, Folder, Search }
 
 /// <summary>The window's icons and control glyphs, drawn as strokes on a <see cref="Canvas"/>.</summary>
 internal static class Glyphs
@@ -20,6 +20,12 @@ internal static class Glyphs
                 c.Lines(w, color, P(7.5f, 7), P(8.5f, 7));
                 c.Lines(w, color, P(11, 7), P(12, 7));
                 c.Lines(w, color, P(5, 10), P(11, 10));
+                break;
+
+            case Icon.Plus:
+                c.StrokeRoundRect(x + 2 * s, y + 2 * s, 12 * s, 12 * s, 2.5f * s, w, color);
+                c.Lines(w, color, P(8, 5), P(8, 11));
+                c.Lines(w, color, P(5, 8), P(11, 8));
                 break;
 
             case Icon.Block:

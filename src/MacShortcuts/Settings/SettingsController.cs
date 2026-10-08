@@ -43,6 +43,28 @@ internal sealed class SettingsController(AppSettings settings, Action<AppSetting
 
     public void ResetShortcuts() => Change(settings.Shortcuts.Clear);
 
+    public IReadOnlyList<CustomShortcut> CustomShortcuts => settings.CustomShortcuts;
+
+    /// <returns>false if a custom shortcut already has the same trigger.</returns>
+    public bool AddCustomShortcut(CustomShortcut shortcut)
+    {
+        if (settings.CustomShortcuts.Any(c => c.Trigger == shortcut.Trigger)) return false;
+        Change(() => settings.CustomShortcuts.Add(shortcut));
+        return true;
+    }
+
+    public void SetCustomShortcutEnabled(int index, bool enabled)
+    {
+        if (index < 0 || index >= settings.CustomShortcuts.Count) return;
+        Change(() => settings.CustomShortcuts[index].Enabled = enabled);
+    }
+
+    public void RemoveCustomShortcut(int index)
+    {
+        if (index < 0 || index >= settings.CustomShortcuts.Count) return;
+        Change(() => settings.CustomShortcuts.RemoveAt(index));
+    }
+
     public void SetExcludedApps(IReadOnlyList<string> apps)
     {
         if (apps.SequenceEqual(settings.ExcludedApps)) return;

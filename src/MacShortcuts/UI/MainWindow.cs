@@ -1,5 +1,6 @@
 using MacShortcuts.Interop;
 using MacShortcuts.Settings;
+using MacShortcuts.Shortcuts;
 using MacShortcuts.UI.Drawing;
 using static MacShortcuts.Interop.ComCtl32;
 using static MacShortcuts.Interop.Gdi32;
@@ -24,11 +25,12 @@ internal sealed unsafe partial class MainWindow : Window
     const uint ExStyle = WS_EX_CONTROLPARENT;
     const int WM_SET_THEME = WM_APP + 1;
     const int WM_REDRAW_CHECKBOXES = WM_APP + 2;
+    const int WM_CUSTOM_KEY = WM_APP + 3;
 
-    internal enum Page { Shortcuts, Excluded, Settings }
+    internal enum Page { Shortcuts, Custom, Excluded, Settings }
 
     /// <summary>How a button draws itself.</summary>
-    enum ButtonKind { Normal, Primary, Link, CheckBox, Toggle, Nav }
+    enum ButtonKind { Normal, Primary, Link, CheckBox, Toggle, Nav, Capture }
 
     /// <summary>What's behind a control, which shows around its rounded corners.</summary>
     enum Backdrop { Window, Surface, SurfaceAlt, Rail }
@@ -36,6 +38,7 @@ internal sealed unsafe partial class MainWindow : Window
     readonly record struct ButtonStyle(ButtonKind Kind, Backdrop Backdrop);
 
     readonly SettingsController _settings;
+    readonly Action<Action<Chord>?> _setCapture;
     readonly Palette _palette;
     readonly IntPtr _surfaceBrush;
     readonly IntPtr _windowBrush;
@@ -46,7 +49,7 @@ internal sealed unsafe partial class MainWindow : Window
     Page _page;
 
     readonly Dictionary<IntPtr, ButtonStyle> _buttons = [];
-    readonly List<IntPtr>[] _pageControls = [[], [], []];
+    readonly List<IntPtr>[] _pageControls = [[], [], [], []];
     readonly List<Action<IntPtr>> _art = [];
 
     readonly IntPtr[] _nav;
@@ -58,10 +61,12 @@ internal sealed unsafe partial class MainWindow : Window
     public event EventHandler? RestartAsAdminRequested;
 
     /// <param name="placement">Where to show the window (e.g. to replace one with the old theme), or null to centre it.</param>
+    /// <param name="setCapture">Starts (or, with null, stops) capturing key combinations from the keyboard, for recording shortcuts.</param>
     /// <param name="page">The page to show first.</param>
-    public MainWindow(SettingsController settings, bool dark, WINDOWPLACEMENT? placement, Page page = Page.Shortcuts)
+    public MainWindow(SettingsController settings, Action<Action<Chord>?> setCapture, bool dark, WINDOWPLACEMENT? placement, Page page = Page.Shortcuts)
     {
         _settings = settings;
+        _setCapture = setCapture;
         _palette = Palette.For(dark);
         _surfaceBrush = CreateSolidBrush(_palette.Surface);
         _windowBrush = CreateSolidBrush(_palette.Window);
@@ -76,12 +81,14 @@ internal sealed unsafe partial class MainWindow : Window
         _nav =
         [
             Button("Shortcuts", ButtonKind.Nav, Backdrop.Rail),
+            Button("Custom", ButtonKind.Nav, Backdrop.Rail),
             Button("Excluded", ButtonKind.Nav, Backdrop.Rail),
             Button("Settings", ButtonKind.Nav, Backdrop.Rail),
         ];
         _masterToggle = Button("Remapping", ButtonKind.Toggle, Backdrop.Rail);
 
         CreateShortcutsPage();
+        CreateCustomPage();
         CreateExcludedPage();
         CreateSettingsPage();
 
@@ -135,14 +142,25 @@ internal sealed unsafe partial class MainWindow : Window
         switch (msg)
         {
             case WM_CLOSE:
+                StopRecording();
                 ShowWindow(Handle, SW_HIDE);
                 HiddenToTray?.Invoke(this, EventArgs.Empty);
                 return 0;
 
             case WM_DESTROY:
                 // The window is destroyed without closing when the theme changes or the app exits.
+                StopRecording();
                 _settings.Changed -= OnSettingsChanged;
                 break;
+
+            case WM_ACTIVATE when LoWord(wParam) == 0:
+                // Deactivated: keys pressed in other windows are not ours to record.
+                StopRecording();
+                break;
+
+            case WM_CUSTOM_KEY:
+                OnCustomKey((Keys)wParam.ToInt32(), (Mods)lParam.ToInt32());
+                return 0;
 
             case WM_SIZE:
                 Layout();
@@ -211,6 +229,7 @@ internal sealed unsafe partial class MainWindow : Window
 
             case WM_REDRAW_CHECKBOXES:
                 _shortcutList.DrawCheckBoxes();
+                _customList.DrawCheckBoxes();
                 return 0;
         }
         return base.WndProc(msg, wParam, lParam);
@@ -236,7 +255,7 @@ internal sealed unsafe partial class MainWindow : Window
         }
         if (_loading) return;
 
-        if (OnShortcutsCommand(control, code) || OnExcludedCommand(control, code) || OnSettingsCommand(control, code)) return;
+        if (OnShortcutsCommand(control, code) || OnCustomCommand(control, code) || OnExcludedCommand(control, code) || OnSettingsCommand(control, code)) return;
         if (code != BN_CLICKED) return;
 
         int nav = Array.IndexOf(_nav, control);
@@ -249,12 +268,14 @@ internal sealed unsafe partial class MainWindow : Window
         if (header->code == NM_CUSTOMDRAW && _buttons.TryGetValue(header->hwndFrom, out var style))
             return DrawButton((NMCUSTOMDRAW*)header, style);
         if (header->hwndFrom == _shortcutList.Handle) return OnShortcutListNotify(header);
+        if (header->hwndFrom == _customList.Handle) return OnCustomListNotify(header);
         if (header->hwndFrom == _excludedList.Handle) return OnExcludedListNotify(header);
         return 0;
     }
 
     void ShowPage(Page page)
     {
+        StopRecording();
         _page = page;
         for (int i = 0; i < _pageControls.Length; i++)
         {
@@ -355,9 +376,23 @@ internal sealed unsafe partial class MainWindow : Window
                     caption, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
                 break;
 
+            case ButtonKind.Capture:
+                bool recording = hwnd == _recording;
+                string? recorded = (hwnd == _triggerBox ? _newTrigger : _newSends) != null ? text : null;
+                uint captureFill = hot && !recording ? _palette.ControlHover : _palette.Surface;
+                Canvas.Render(hdc, rc, backdrop, c => c.RoundRect(0, 0, width, height, Scale(6), captureFill,
+                    recording ? _palette.Accent : _palette.ControlBorder, recording ? Math.Max(2, Scale(2)) : 1));
+                var captureText = rc with { left = rc.left + Scale(10), right = rc.right - Scale(10) };
+                if (recorded != null && !recording)
+                    KeyCaps.Draw(hdc, captureText, recorded, hwnd == _triggerBox, _palette, _fonts.Key, _fonts.KeySymbol, _dpi);
+                else
+                    Paint.Text(hdc, recording ? _recordHint : hwnd == _triggerBox ? "Click, then press a shortcut" : "Click, then press the keys to send",
+                        _fonts.Body, _palette.MutedText, captureText, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                break;
+
             case ButtonKind.Nav:
                 bool selected = Array.IndexOf(_nav, hwnd) == (int)_page;
-                var icon = Array.IndexOf(_nav, hwnd) switch { 0 => Icon.Keyboard, 1 => Icon.Block, _ => Icon.Wrench };
+                var icon = Array.IndexOf(_nav, hwnd) switch { 0 => Icon.Keyboard, 1 => Icon.Plus, 2 => Icon.Block, _ => Icon.Wrench };
                 uint color = selected ? _palette.RailSelectedText : _palette.MutedText;
                 int iconSize = Scale(20);
                 Canvas.Render(hdc, rc, backdrop, c =>
@@ -409,6 +444,7 @@ internal sealed unsafe partial class MainWindow : Window
         switch (_page)
         {
             case Page.Shortcuts: LayoutShortcutsPage(client); break;
+            case Page.Custom: LayoutCustomPage(client); break;
             case Page.Excluded: LayoutExcludedPage(client); break;
             case Page.Settings: LayoutSettingsPage(client); break;
         }
@@ -460,6 +496,7 @@ internal sealed unsafe partial class MainWindow : Window
         _fonts = new Fonts(_dpi);
         ApplyFonts();
         OnShortcutsDpiChanged();
+        OnCustomDpiChanged();
         OnExcludedDpiChanged();
         SetWindowPos(Handle, IntPtr.Zero, suggested.left, suggested.top,
             suggested.right - suggested.left, suggested.bottom - suggested.top, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -473,6 +510,9 @@ internal sealed unsafe partial class MainWindow : Window
         _shortcutList.CheckBoxPadding = Scale(10);
         _shortcutList.CheckBoxGap = Scale(8);
         _shortcutList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(34), _dpi, headerPadding: Scale(6), groupGap: Scale(16));
+        _customList.CheckBoxPadding = Scale(10);
+        _customList.CheckBoxGap = Scale(8);
+        _customList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(56), _dpi);
         _excludedList.ApplyStyle(_palette, _fonts.Body, _fonts.SmallStrong, Scale(56), _dpi);
         SendMessage(_categories, LB_SETITEMHEIGHT, IntPtr.Zero, CategoryItemHeight);
     }
@@ -483,7 +523,7 @@ internal sealed unsafe partial class MainWindow : Window
         DwmApi.DwmSetWindowAttribute(Handle, DwmApi.DWMWA_USE_IMMERSIVE_DARK_MODE, dark, sizeof(int));
         // The Explorer themes give the lists modern scrollbars; the dark one darkens them.
         string lists = _palette.IsDark ? "DarkMode_Explorer" : "Explorer";
-        foreach (var hwnd in (ReadOnlySpan<IntPtr>)[_shortcutList.Handle, _excludedList.Handle, _categories])
+        foreach (var hwnd in (ReadOnlySpan<IntPtr>)[_shortcutList.Handle, _customList.Handle, _excludedList.Handle, _categories])
         {
             UxTheme.AllowDarkModeForWindow(hwnd, _palette.IsDark);
             UxTheme.SetWindowTheme(hwnd, lists, null);
@@ -497,6 +537,7 @@ internal sealed unsafe partial class MainWindow : Window
         LoadSettingsPage();
         _loading = false;
         SyncToggles();
+        SyncCustom();
         SyncExcluded();
     }
 
@@ -506,6 +547,7 @@ internal sealed unsafe partial class MainWindow : Window
         // A handler that ran before this one may have destroyed the window (e.g. to apply a theme).
         if (Handle == IntPtr.Zero) return;
         SyncToggles();
+        SyncCustom();
         SyncExcluded();
     }
 
@@ -534,6 +576,8 @@ internal sealed unsafe partial class MainWindow : Window
     IntPtr Button(string text, ButtonKind kind, Backdrop backdrop, Page? page = null)
     {
         uint style = kind is ButtonKind.CheckBox or ButtonKind.Toggle ? BS_AUTOCHECKBOX : BS_PUSHBUTTON;
+        // Capture boxes report losing focus, which ends recording.
+        if (kind == ButtonKind.Capture) style |= BS_NOTIFY;
         IntPtr hwnd = Child(page, "BUTTON", text, style | WS_TABSTOP);
         _buttons[hwnd] = new ButtonStyle(kind, backdrop);
         return hwnd;
