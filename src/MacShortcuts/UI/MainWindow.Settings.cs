@@ -19,6 +19,8 @@ internal sealed unsafe partial class MainWindow
     IntPtr _startupBox;
     IntPtr _leftAltBox;
     IntPtr _rightAltBox;
+    IntPtr _leftWinBox;
+    IntPtr _rightWinBox;
     IntPtr _ignoreInjectedBox;
     IntPtr _theme;
     IntPtr _admin;
@@ -30,6 +32,8 @@ internal sealed unsafe partial class MainWindow
         _startupBox = Button("Start with Windows", ButtonKind.CheckBox, Backdrop.Surface, Page.Settings);
         _leftAltBox = Button("Left Alt acts as ⌘ Cmd", ButtonKind.CheckBox, Backdrop.Surface, Page.Settings);
         _rightAltBox = Button("Right Alt acts as ⌘ Cmd", ButtonKind.CheckBox, Backdrop.Surface, Page.Settings);
+        _leftWinBox = Button("Left Win acts as ⌘ Cmd", ButtonKind.CheckBox, Backdrop.Surface, Page.Settings);
+        _rightWinBox = Button("Right Win acts as ⌘ Cmd", ButtonKind.CheckBox, Backdrop.Surface, Page.Settings);
         _ignoreInjectedBox = Button("Ignore keys from other apps", ButtonKind.CheckBox, Backdrop.Surface, Page.Settings);
         _theme = Child(Page.Settings, "COMBOBOX", null, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP);
         foreach (string name in Enum.GetNames<AppTheme>()) SendMessage(_theme, CB_ADDSTRING, IntPtr.Zero, name);
@@ -48,6 +52,8 @@ internal sealed unsafe partial class MainWindow
         [
             new("Left Alt acts as ⌘ Cmd", "The key where ⌘ sits on a Mac keyboard.", _leftAltBox, true),
             new("Right Alt acts as ⌘ Cmd", "On layouts with AltGr (German, French…), this replaces AltGr characters such as €.", _rightAltBox, true),
+            new("Left Win acts as ⌘ Cmd", "Useful when your ⌘ key sends Win (a Mac keyboard, or Alt/Win swapped): pressing ⌘ then fires the same shortcuts.", _leftWinBox, true),
+            new("Right Win acts as ⌘ Cmd", "Turn both off to keep the Win key doing its Windows shortcuts instead.", _rightWinBox, true),
         ]),
         ("Compatibility",
         [
@@ -80,6 +86,8 @@ internal sealed unsafe partial class MainWindow
         else if (control == _startupBox) SetStartup(IsChecked(_startupBox));
         else if (control == _leftAltBox) _settings.SetUseLeftAlt(IsChecked(_leftAltBox));
         else if (control == _rightAltBox) _settings.SetUseRightAlt(IsChecked(_rightAltBox));
+        else if (control == _leftWinBox) _settings.SetUseLeftWin(IsChecked(_leftWinBox));
+        else if (control == _rightWinBox) _settings.SetUseRightWin(IsChecked(_rightWinBox));
         else if (control == _ignoreInjectedBox) _settings.SetIgnoreInjectedKeys(IsChecked(_ignoreInjectedBox));
         else if (control == _admin && _admin != IntPtr.Zero) RestartAsAdminRequested?.Invoke(this, EventArgs.Empty);
         else if (control == _openFolder) OpenSettingsFolder();
@@ -98,8 +106,10 @@ internal sealed unsafe partial class MainWindow
         SetChecked(_enabledBox, _settings.Enabled);
         SetChecked(_leftAltBox, _settings.UseLeftAlt);
         SetChecked(_rightAltBox, _settings.UseRightAlt);
+        SetChecked(_leftWinBox, _settings.UseLeftWin);
+        SetChecked(_rightWinBox, _settings.UseRightWin);
         SetChecked(_ignoreInjectedBox, _settings.IgnoreInjectedKeys);
-        foreach (var box in (ReadOnlySpan<IntPtr>)[_enabledBox, _startupBox, _leftAltBox, _rightAltBox, _ignoreInjectedBox])
+        foreach (var box in (ReadOnlySpan<IntPtr>)[_enabledBox, _startupBox, _leftAltBox, _rightAltBox, _leftWinBox, _rightWinBox, _ignoreInjectedBox])
             InvalidateRect(box, IntPtr.Zero, false);
     }
 

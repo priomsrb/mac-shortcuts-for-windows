@@ -22,7 +22,7 @@ public static class Kb {
 }
 '@
 
-$VK = @{ Alt = 0xA4; RAlt = 0xA5; Shift = 0xA0; A = 0x41; C = 0x43; V = 0x56; X = 0x58; Z = 0x5A; Left = 0x25; Right = 0x27; Back = 0x08; End = 0x23 }
+$VK = @{ Alt = 0xA4; RAlt = 0xA5; Win = 0x5B; Shift = 0xA0; A = 0x41; C = 0x43; V = 0x56; X = 0x58; Z = 0x5A; Left = 0x25; Right = 0x27; Back = 0x08; End = 0x23 }
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'MacShortcuts smoke test'
@@ -100,6 +100,17 @@ try {
     Press @('RAlt') 'C'
     $clip = [System.Windows.Forms.Clipboard]::GetText().TrimEnd()
     Check 'Right Alt+A, Right Alt+C copies' ($clip -eq 'a') "clipboard='$clip'"
+
+    Press @('Win') 'A'
+    Check 'Win+A selects all (Win as Cmd)' ($tb.SelectionLength -eq 1) "selection=$($tb.SelectionLength)"
+
+    Press @('Win') 'C'
+    $clip = [System.Windows.Forms.Clipboard]::GetText().TrimEnd()
+    Check 'Win+C copies (Win as Cmd)' ($clip -eq 'a') "clipboard='$clip'"
+
+    # If releasing Win had opened the Start menu, typing would not reach the textbox.
+    Press @() 'x'
+    Check 'No Start menu after Win release' ($tb.Text -eq 'ax') "text='$($tb.Text)'"
 }
 catch {
     Write-Output "Aborted: $_"

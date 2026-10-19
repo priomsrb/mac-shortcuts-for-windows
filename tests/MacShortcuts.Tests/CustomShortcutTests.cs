@@ -99,7 +99,10 @@ public class CustomShortcutTests
     [Fact]
     public void CtrlWinK_SendsRecordedKeys_WrappedInMaskKeys()
     {
-        _engine.Update(With(CustomShortcut.From(new Chord(Keys.K, Mods.Ctrl | Mods.Win), new Chord(Keys.Home))).ToConfig());
+        // Win-as-Cmd is off here: these tests exercise the Win-as-Win custom trigger feature.
+        var settings = With(CustomShortcut.From(new Chord(Keys.K, Mods.Ctrl | Mods.Win), new Chord(Keys.Home)));
+        settings.UseLeftWin = false;
+        _engine.Update(settings.ToConfig());
         Hold(VK_LCONTROL);
         Hold(VK_LWIN);
 
@@ -112,7 +115,9 @@ public class CustomShortcutTests
     public void AltWinLeft_SendingWinLeft_KeepsWinHeldAndSendsNoClosingMaskKey()
     {
         // A mask key tap after Win+Left would stop Windows snapping the window.
-        _engine.Update(With(CustomShortcut.From(new Chord(Keys.Left, Mods.Alt | Mods.Win), new Chord(Keys.Left, Mods.Win))).ToConfig());
+        var settings = With(CustomShortcut.From(new Chord(Keys.Left, Mods.Alt | Mods.Win), new Chord(Keys.Left, Mods.Win)));
+        settings.UseLeftWin = false;
+        _engine.Update(settings.ToConfig());
         Hold(VK_LMENU);
         Hold(VK_LWIN);
 

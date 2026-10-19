@@ -111,12 +111,10 @@ public class RemapEngineTests
         Assert.Equal(1, _system.MinimizeCount);
     }
 
-    [Theory]
-    [InlineData(VK_LCONTROL)]
-    [InlineData(VK_RWIN)]
-    public void WithCtrlOrWinHeld_NothingIsRemapped(int modifier)
+    [Fact]
+    public void WithCtrlHeld_NothingIsRemapped()
     {
-        Press(modifier);
+        Press(VK_LCONTROL);
         Press(VK_LMENU);
         Assert.False(Press(C));
         AssertSent([]);
@@ -145,6 +143,73 @@ public class RemapEngineTests
         Press(VK_RMENU);
         Assert.True(Press(C));
         AssertSent([.. ReleasedAlt(VK_RMENU), KeyDown(VK_LCONTROL), KeyDown(C), KeyUp(C), KeyUp(VK_LCONTROL)]);
+    }
+
+    [Fact]
+    public void WinAsCmd_AltC_SendsCtrlC()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_LWIN);
+        Assert.True(Press(C));
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(VK_LCONTROL), KeyDown(C), KeyUp(C), KeyUp(VK_LCONTROL)]);
+        Assert.True(Release(C));
+        Assert.True(Release(VK_LWIN)); // Already released logically; the physical key-up is swallowed.
+        AssertSent([]);
+    }
+
+    [Fact]
+    public void WinAsCmdOff_WinC_PassesThrough()
+    {
+        Configure(new AppSettings { UseLeftWin = false });
+        Press(VK_LWIN);
+        Assert.False(Press(C));
+        Release(C);
+        Assert.False(Release(VK_LWIN)); // Windows still thinks Win is down, so it needs the key-up.
+        AssertSent([]);
+    }
+
+    [Fact]
+    public void WinAsCmd_ReinjectsWinForUnmappedKeyAfterShortcut()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_LWIN);
+        Tap(C);
+        _system.Sent.Clear();
+
+        Assert.True(Press(J));
+        AssertSent([KeyDown(VK_LWIN), new SyntheticInput.Replay(new KeyEvent(J, Up: false))]);
+        Assert.False(Release(J));
+        Assert.False(Release(VK_LWIN)); // Windows thinks Win is down again, so it needs the key-up.
+    }
+
+    [Fact]
+    public void WinAsCmd_TabOpensSwitcher()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_LWIN);
+        Assert.True(Press(Tab));
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(VK_LMENU), KeyDown(Tab), KeyUp(Tab)]);
+        Assert.True(Release(Tab));
+        Assert.True(Release(VK_LWIN)); // Swallowed; releasing the ⌘ key lifts the synthetic Alt.
+        AssertSent([new SyntheticInput.Key(VK_LMENU, Up: true)]);
+    }
+
+    [Fact]
+    public void WinAsCmd_WinLeft_ActsAsHomeNotWordJump()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_LWIN);
+        Assert.True(Press(Left)); // ⌘+Left -> Home, like Alt+Left, not the Win+Left word jump.
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(Home), KeyUp(Home)]);
+    }
+
+    [Fact]
+    public void WinAsCmd_RightWin_RemapsToo()
+    {
+        Configure(new AppSettings { UseRightWin = true });
+        Press(VK_RWIN);
+        Assert.True(Press(C));
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_RWIN), KeyDown(VK_LCONTROL), KeyDown(C), KeyUp(C), KeyUp(VK_LCONTROL)]);
     }
 
     [Fact]
@@ -316,7 +381,10 @@ public class RemapEngineTests
     [Fact]
     public void WinLeft_WhenOn_SendsCtrlLeftAndMasksStartMenu()
     {
-        Enable("nav.winWord");
+        // The Win key must be its usual self for the Win-modifier binding; Win-as-Cmd would claim it.
+        var settings = new AppSettings { UseLeftWin = false };
+        settings.Shortcuts["nav.winWord"] = true;
+        Configure(settings);
         Press(VK_LWIN);
         Assert.True(Press(Left));
         AssertSent([KeyDown(Mask), KeyUp(Mask), KeyDown(VK_LCONTROL), KeyUp(VK_LWIN), KeyDown(Left), KeyUp(Left),
@@ -326,7 +394,9 @@ public class RemapEngineTests
     [Fact]
     public void WinShiftLeft_WhenOn_SelectsWord()
     {
-        Enable("nav.winSelectWord");
+        var settings = new AppSettings { UseLeftWin = false };
+        settings.Shortcuts["nav.winSelectWord"] = true;
+        Configure(settings);
         Press(VK_LWIN);
         Press(VK_LSHIFT);
         Assert.True(Press(Left));

@@ -36,6 +36,8 @@ internal sealed class RemapEngine(IInputSystem system)
     bool _lShift, _rShift, _lCtrl, _rCtrl, _lWin, _rWin;
     bool _ctrlClickActive;
     bool _altTabActive;              // Alt+Tab switcher is (probably) open; leave clicks alone
+    bool _lWinLogical, _rWinLogical; // what Windows currently thinks of the Win/⌘ key
+    bool _winTabAltDown;             // synthetic Left Alt holding a ⌘+Tab switcher open
     readonly HashSet<int> _swallowedKeyUps = [];
 
     public void Update(RemapConfig config)
@@ -58,6 +60,7 @@ internal sealed class RemapEngine(IInputSystem system)
     bool Ctrl => _lCtrl || _rCtrl;
     bool Win => _lWin || _rWin;
     bool AltAsCmd(RemapConfig cfg) => (_lAlt && cfg.LeftAlt) || (_rAlt && cfg.RightAlt);
+    bool WinAsCmd(RemapConfig cfg) => (_lWin && cfg.LeftWin) || (_rWin && cfg.RightWin);
 
     /// <returns>true to swallow the key event.</returns>
     public bool OnKey(KeyEvent k)
@@ -74,8 +77,8 @@ internal sealed class RemapEngine(IInputSystem system)
                 if (k.ScanCode != AltGrFakeCtrlScanCode) _lCtrl = !k.Up;
                 return false;
             case VK_RCONTROL: _rCtrl = !k.Up; return false;
-            case VK_LWIN: _lWin = !k.Up; return false;
-            case VK_RWIN: _rWin = !k.Up; return false;
+            case VK_LWIN: return OnCmdKey(ref _lWin, ref _lWinLogical, k.Up);
+            case VK_RWIN: return OnCmdKey(ref _rWin, ref _rWinLogical, k.Up);
         }
 
         if (k.Up) return _swallowedKeyUps.Remove(k.Vk);
@@ -105,7 +108,14 @@ internal sealed class RemapEngine(IInputSystem system)
         // Clicking a window in the Alt+Tab switcher needs a plain click with Alt still held.
         if (k.Vk == (int)Keys.Tab && (_lAlt || _rAlt)) _altTabActive = true;
 
-        return ReinjectWithAlt(k);
+        // ⌘ (Win) as Cmd: Win+Tab opens the app switcher like Alt+Tab.
+        if (k.Vk == (int)Keys.Tab && WinAsCmd(cfg))
+        {
+            SwallowTabViaWin();
+            return true;
+        }
+
+        return ReinjectCmd(k);
     }
 
     /// <returns>true to swallow the mouse event.</returns>
@@ -115,12 +125,13 @@ internal sealed class RemapEngine(IInputSystem system)
         {
             ReconcileModifiers();
             var cfg = _config;
-            if (!cfg.Enabled || !cfg.CtrlClick || !AltAsCmd(cfg) || Ctrl || Win || _altTabActive
+            if (!cfg.Enabled || !cfg.CtrlClick || (!AltAsCmd(cfg) && !WinAsCmd(cfg)) || Ctrl || Win || _altTabActive
                 || IsExcluded(cfg, () => system.GetProcessNameAt(point)))
                 return false;
 
             var inputs = new List<SyntheticInput>();
             ReleaseAlt(inputs);
+            if (WinAsCmd(cfg)) ReleaseCmd(inputs);
             inputs.Add(new SyntheticInput.Key(VK_LCONTROL, Up: false));
             inputs.Add(new SyntheticInput.LeftButton(Up: false));
             system.Send(inputs);
@@ -142,18 +153,34 @@ internal sealed class RemapEngine(IInputSystem system)
     {
         ReconcileModifiers();
         var cfg = _config;
-        if (!cfg.Enabled || !cfg.CtrlScroll || !AltAsCmd(cfg) || Ctrl || Win || _altTabActive
+        if (!cfg.Enabled || !cfg.CtrlScroll || (!AltAsCmd(cfg) && !WinAsCmd(cfg)) || Ctrl || Win || _altTabActive
             || IsExcluded(cfg, () => system.GetProcessNameAt(point)))
             return false;
 
         var inputs = new List<SyntheticInput>();
         ReleaseAlt(inputs);
+        if (WinAsCmd(cfg)) ReleaseCmd(inputs);
         // During an Alt+Click, Ctrl is already down and must stay down until the button is released.
         if (!_ctrlClickActive) inputs.Add(new SyntheticInput.Key(VK_LCONTROL, Up: false));
         inputs.Add(new SyntheticInput.Wheel(delta));
         if (!_ctrlClickActive) inputs.Add(new SyntheticInput.Key(VK_LCONTROL, Up: true));
         system.Send(inputs);
         return true;
+    }
+
+    bool OnCmdKey(ref bool physical, ref bool logical, bool up)
+    {
+        bool swallow = HandleAlt(ref physical, ref logical, up);
+        if (!_lWin && !_rWin)
+        {
+            if (_winTabAltDown)
+            {
+                system.Send(new SyntheticInput[] { new SyntheticInput.Key(VK_LMENU, Up: true) });
+                _winTabAltDown = false;
+            }
+            if (!_lAlt && !_rAlt) _altTabActive = false;
+        }
+        return swallow;
     }
 
     bool OnAlt(ref bool physical, ref bool logical, bool up)
@@ -185,13 +212,17 @@ internal sealed class RemapEngine(IInputSystem system)
         return true;
     }
 
-    /// <summary>The Alt (as Cmd), Ctrl and Win keys held, which together with Shift select the shortcut.</summary>
+    /// <summary>The Cmd (Alt as Cmd, or Win acting as Cmd), Ctrl and Win keys held, which with Shift select the shortcut.</summary>
     Mods HeldVia(RemapConfig cfg)
     {
         bool alt = _lAlt || _rAlt;
+        bool winCmd = WinAsCmd(cfg);
         // Alt that isn't acting as Cmd is a plain Alt: leave the combination alone.
         if (alt && !AltAsCmd(cfg)) return Mods.None;
-        return (alt ? Mods.Alt : 0) | (Ctrl ? Mods.Ctrl : 0) | (Win ? Mods.Win : 0);
+        var via = (alt ? Mods.Alt : 0) | (Ctrl ? Mods.Ctrl : 0);
+        // The ⌘ (Win) key either joins Alt as Cmd, or stays its usual Win self.
+        if (_lWin || _rWin) via |= winCmd ? Mods.Alt : Mods.Win;
+        return via;
     }
 
     /// <summary>
@@ -203,6 +234,7 @@ internal sealed class RemapEngine(IInputSystem system)
     {
         var inputs = new List<SyntheticInput>();
         ReleaseAlt(inputs);
+        if (via.HasFlag(Mods.Alt) && (_lWin || _rWin) && !via.HasFlag(Mods.Win)) ReleaseCmd(inputs); // ⌘ (Win) as Cmd: lift it for the injected chord
         bool win = via.HasFlag(Mods.Win);
         if (win)
         {
@@ -268,21 +300,60 @@ internal sealed class RemapEngine(IInputSystem system)
     }
 
     /// <summary>
-    /// The user pressed an unmapped key while holding Alt after we'd released it logically
-    /// (e.g. Alt+C then Alt+Tab). Re-press Alt and replay the key so the combo works.
+    /// The user pressed an unmapped key while holding a Cmd modifier after we'd released it logically
+    /// (e.g. Alt+C then Alt+Tab, or ⌘+C then ⌘+Tab). Re-press the modifier and replay the key so the combo works.
     /// </summary>
-    bool ReinjectWithAlt(KeyEvent k)
+    bool ReinjectCmd(KeyEvent k)
     {
         bool left = _lAlt && !_lAltLogical;
         bool right = _rAlt && !_rAltLogical;
-        if (!left && !right) return false;
+        bool wleft = _lWin && !_lWinLogical;
+        bool wright = _rWin && !_rWinLogical;
+        if (!left && !right && !wleft && !wright) return false;
 
         var inputs = new List<SyntheticInput>();
         if (left) { inputs.Add(new SyntheticInput.Key(VK_LMENU, Up: false)); _lAltLogical = true; }
         if (right) { inputs.Add(new SyntheticInput.Key(VK_RMENU, Up: false)); _rAltLogical = true; }
+        if (wleft) { inputs.Add(new SyntheticInput.Key(VK_LWIN, Up: false)); _lWinLogical = true; }
+        if (wright) { inputs.Add(new SyntheticInput.Key(VK_RWIN, Up: false)); _rWinLogical = true; }
         inputs.Add(new SyntheticInput.Replay(k));
         system.Send(inputs);
         return true;
+    }
+
+    /// <summary>Release the ⌘ (Win) key in Windows' eyes while the user keeps holding it. The mask key is tapped first: a Win down followed by an up with nothing between would open Start.</summary>
+    void ReleaseCmd(List<SyntheticInput> inputs)
+    {
+        if (!_lWinLogical && !_rWinLogical) return;
+        // The mask tap makes the OS see the Win press as part of a chord, not a bare tap.
+        if (_lWinLogical)
+        {
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
+            inputs.Add(new SyntheticInput.Key(VK_LWIN, Up: true));
+            _lWinLogical = false;
+        }
+        if (_rWinLogical)
+        {
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: false));
+            inputs.Add(new SyntheticInput.Key(MaskKey, Up: true));
+            inputs.Add(new SyntheticInput.Key(VK_RWIN, Up: true));
+            _rWinLogical = false;
+        }
+    }
+
+    /// <summary>⌘ (Win)+Tab opens the app switcher: hold a synthetic Alt so Windows treats it like Alt+Tab.</summary>
+    void SwallowTabViaWin()
+    {
+        var inputs = new List<SyntheticInput>();
+        ReleaseCmd(inputs);
+        inputs.Add(new SyntheticInput.Key(VK_LMENU, Up: false));
+        inputs.Add(new SyntheticInput.Key((int)Keys.Tab, Up: false));
+        inputs.Add(new SyntheticInput.Key((int)Keys.Tab, Up: true));
+        system.Send(inputs);
+        _winTabAltDown = true;
+        _altTabActive = true;
+        _swallowedKeyUps.Add((int)Keys.Tab);
     }
 
     void SetMods(List<SyntheticInput> inputs, ref Mods current, Mods target)
@@ -323,6 +394,9 @@ internal sealed class RemapEngine(IInputSystem system)
         // Only verifiable while Windows still thinks Alt is down.
         if (_lAltLogical) { Fix(ref _lAlt, VK_LMENU); _lAltLogical = _lAlt; }
         if (_rAltLogical) { Fix(ref _rAlt, VK_RMENU); _rAltLogical = _rAlt; }
+        // Same for a ⌘ (Win) key we released logically.
+        if (_lWinLogical) { Fix(ref _lWin, VK_LWIN); _lWinLogical = _lWin; }
+        if (_rWinLogical) { Fix(ref _rWin, VK_RWIN); _rWinLogical = _rWin; }
         if (!_lAlt && !_rAlt) _altTabActive = false;
     }
 
@@ -330,6 +404,8 @@ internal sealed class RemapEngine(IInputSystem system)
     {
         _resetRequested = false;
         _lAlt = _rAlt = _lAltLogical = _rAltLogical = false;
+        _lWinLogical = _rWinLogical = false;
+        _winTabAltDown = false;
         _lShift = _rShift = _lCtrl = _rCtrl = _lWin = _rWin = false;
         _altTabActive = false;
         _swallowedKeyUps.Clear();

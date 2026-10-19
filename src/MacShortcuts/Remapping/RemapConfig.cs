@@ -6,12 +6,14 @@ public sealed record RemapConfig(
     bool Enabled,
     bool LeftAlt,
     bool RightAlt,
+    bool LeftWin,
+    bool RightWin,
     bool CtrlClick,
     bool CtrlScroll,
     IReadOnlyDictionary<Trigger, ShortcutAction> Map,
     IReadOnlySet<string> ExcludedApps,
     bool IgnoreInjectedKeys = false)
 {
-    public static RemapConfig Disabled { get; } = new(false, false, false, false, false,
+    public static RemapConfig Disabled { get; } = new(false, false, false, false, false, false, false,
         new Dictionary<Trigger, ShortcutAction>(), new HashSet<string>());
 }
