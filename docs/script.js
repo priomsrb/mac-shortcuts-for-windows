@@ -11,12 +11,16 @@
       caption: "Every shortcut, grouped by category, with a filter box. Tick or untick each one.",
       alt: "The Shortcuts page, listing Mac-style shortcuts such as Alt+C next to what they send, such as Ctrl+C",
     },
+    custom: {
+      caption: "Record your own: press one combination and another is sent instead. They take priority over the built-in ones.",
+      alt: "The Custom page, with recorded shortcuts such as Alt+J sending the Down arrow",
+    },
     excluded: {
       caption: "Apps where nothing is remapped, like Remote Desktop. Type a name, pick a running app or browse for an .exe.",
       alt: "The Excluded apps page, with mstsc.exe and vmconnect.exe in the list",
     },
     settings: {
-      caption: "Start with Windows, which Alt keys act as ⌘, the theme and restarting as administrator.",
+      caption: "Start with Windows, which Alt or Win keys act as ⌘, ignoring keys from other apps, the theme and restarting as administrator.",
       alt: "The Settings page, with options for starting with Windows, the Cmd key, the theme and administrator mode",
     },
   };

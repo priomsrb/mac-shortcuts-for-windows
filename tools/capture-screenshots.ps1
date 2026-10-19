@@ -1,4 +1,4 @@
-# Regenerates docs/images/{shortcuts,excluded,settings}-{light,dark}.png from the Debug build.
+# Regenerates docs/images/{shortcuts,custom,excluded,settings}-{light,dark}.png from the Debug build.
 # See tools/SCREENSHOTS.md. Run from PowerShell (not elevated); keep hands off the mouse while it runs.
 # It temporarily replaces %APPDATA%\MacShortcuts\settings.json and restores it afterwards.
 param(
@@ -40,7 +40,7 @@ try {
     foreach ($theme in 'Light', 'Dark') {
         Stop-Process -Name MacShortcuts -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 500
-        @{ Enabled = $true; UseLeftAlt = $true; UseRightAlt = $true; Theme = $theme; Shortcuts = @{}; ExcludedApps = @('mstsc.exe', 'vmconnect.exe') } |
+        @{ Enabled = $true; UseLeftAlt = $true; UseRightAlt = $true; Theme = $theme; Shortcuts = @{}; ExcludedApps = @('mstsc.exe', 'vmconnect.exe'); CustomShortcuts = @(@{ Key = 74; Via = 4; SendsKey = 40 }, @{ Key = 75; Via = 4; SendsKey = 38 }, @{ Key = 68; Via = 4; Shift = $true; SendsKey = 116 }) } |
             ConvertTo-Json | Set-Content $settingsPath -Encoding utf8
         $p = Start-Process $Exe -PassThru
         $h = [IntPtr]::Zero

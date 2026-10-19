@@ -117,6 +117,7 @@
       <div class="tour">
         <div class="tour-tabs" role="tablist" aria-label="App screenshots">
           <button role="tab" aria-selected="true" aria-controls="shot" data-shot="shortcuts">Shortcuts</button>
+          <button role="tab" aria-selected="false" aria-controls="shot" data-shot="custom">Custom</button>
           <button role="tab" aria-selected="false" aria-controls="shot" data-shot="excluded">Excluded apps</button>
           <button role="tab" aria-selected="false" aria-controls="shot" data-shot="settings">Settings</button>
         </div>
@@ -409,6 +410,14 @@
         <details>
           <summary>My keyboard layout uses AltGr for characters like € or @.</summary>
           <p>On layouts with AltGr (German, French and others), remapping right Alt would replace those characters. Untick <strong>Right Alt acts as ⌘ Cmd</strong> in Settings, and left Alt keeps working as ⌘.</p>
+        </details>
+        <details>
+          <summary>Can I use the Win key as ⌘ Cmd, or add my own shortcuts?</summary>
+          <p>Yes to both. On a Mac keyboard, or one where ⌘ sends Win, tick <strong>Left/Right Win acts as ⌘ Cmd</strong> in Settings (off by default). To make your own, open the <strong>Custom</strong> page, click a box, press the combination you want and the keys to send, then click Add. Custom shortcuts win over built-in ones that use the same keys.</p>
+        </details>
+        <details>
+          <summary>Shortcuts fire for keys sent by PowerToys or other tools.</summary>
+          <p>Leave <strong>Ignore keys from other apps</strong> ticked in Settings (the default), and only your physical keyboard triggers shortcuts.</p>
         </details>
         <details>
           <summary>An app needs Alt for itself. Can I turn the remapping off there?</summary>
