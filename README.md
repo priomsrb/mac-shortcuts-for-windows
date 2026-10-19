@@ -69,6 +69,7 @@ This uses [Native AOT](https://learn.microsoft.com/dotnet/core/deploying/native-
 
 - `dotnet test`: unit tests for the remapping logic, shortcut catalog and settings.
 - `tools/smoke-test.ps1`: with the app running, opens a test window and simulates shortcuts to verify the remapping end to end.
+- `tools/build-release.bat` (or `.ps1`): runs the tests and builds the release exe plus its SHA256 checksum into `publish/release` (the same steps as the release workflow; `-SkipTests` skips the tests).
 - `tools/generate-icon.ps1`: regenerates `src/MacShortcuts/app.ico`.
 
 ## Releasing
