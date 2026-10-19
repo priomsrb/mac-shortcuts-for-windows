@@ -29,7 +29,7 @@ public sealed class KeyRemapper : IDisposable
     }
 
     /// <inheritdoc cref="RemapEngine.SetCapture"/>
-    public void SetCapture(Action<Chord>? onCaptured) => _engine.SetCapture(onCaptured);
+    public void SetCapture(Action<Chord>? onCaptured, bool trigger) => _engine.SetCapture(onCaptured, trigger);
 
     /// <inheritdoc cref="RemapEngine.ResetKeyState"/>
     public void ResetKeyState()

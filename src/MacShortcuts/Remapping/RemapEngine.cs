@@ -29,6 +29,7 @@ internal sealed class RemapEngine(IInputSystem system)
     volatile RemapConfig _config = RemapConfig.Disabled;
     volatile bool _resetRequested;
     volatile Action<Chord>? _capture;
+    volatile bool _captureTrigger;
 
     // Everything below is only touched on the input thread.
     bool _lAlt, _rAlt;               // physically held
@@ -51,7 +52,12 @@ internal sealed class RemapEngine(IInputSystem system)
     /// instead of being remapped, so the user can record a shortcut. Pass null to stop.
     /// <paramref name="onCaptured"/> is called on the input thread and must return quickly.
     /// </summary>
-    public void SetCapture(Action<Chord>? onCaptured) => _capture = onCaptured;
+    /// <param name="trigger">Recording a shortcut's trigger: a Win key acting as ⌘ Cmd is reported as Alt, as it fires shortcuts.</param>
+    public void SetCapture(Action<Chord>? onCaptured, bool trigger = false)
+    {
+        _captureTrigger = trigger;
+        _capture = onCaptured;
+    }
 
     /// <summary>Forget tracked key state, e.g. after the session was locked and key-ups were missed.</summary>
     public void ResetKeyState() => _resetRequested = true;
@@ -61,6 +67,8 @@ internal sealed class RemapEngine(IInputSystem system)
     bool Win => _lWin || _rWin;
     bool AltAsCmd(RemapConfig cfg) => (_lAlt && cfg.LeftAlt) || (_rAlt && cfg.RightAlt);
     bool WinAsCmd(RemapConfig cfg) => (_lWin && cfg.LeftWin) || (_rWin && cfg.RightWin);
+    // A Win key held that isn't acting as Cmd.
+    bool WinAsWin(RemapConfig cfg) => (_lWin && !cfg.LeftWin) || (_rWin && !cfg.RightWin);
 
     /// <returns>true to swallow the key event.</returns>
     public bool OnKey(KeyEvent k)
@@ -109,7 +117,8 @@ internal sealed class RemapEngine(IInputSystem system)
         if (k.Vk == (int)Keys.Tab && (_lAlt || _rAlt)) _altTabActive = true;
 
         // ⌘ (Win) as Cmd: Win+Tab opens the app switcher like Alt+Tab.
-        if (k.Vk == (int)Keys.Tab && WinAsCmd(cfg))
+        if (k.Vk == (int)Keys.Tab && cfg.Enabled && remappable && WinAsCmd(cfg)
+            && !IsExcluded(cfg, system.GetForegroundProcessName))
         {
             SwallowTabViaWin();
             return true;
@@ -125,7 +134,7 @@ internal sealed class RemapEngine(IInputSystem system)
         {
             ReconcileModifiers();
             var cfg = _config;
-            if (!cfg.Enabled || !cfg.CtrlClick || (!AltAsCmd(cfg) && !WinAsCmd(cfg)) || Ctrl || Win || _altTabActive
+            if (!cfg.Enabled || !cfg.CtrlClick || (!AltAsCmd(cfg) && !WinAsCmd(cfg)) || Ctrl || WinAsWin(cfg) || _altTabActive
                 || IsExcluded(cfg, () => system.GetProcessNameAt(point)))
                 return false;
 
@@ -153,7 +162,7 @@ internal sealed class RemapEngine(IInputSystem system)
     {
         ReconcileModifiers();
         var cfg = _config;
-        if (!cfg.Enabled || !cfg.CtrlScroll || (!AltAsCmd(cfg) && !WinAsCmd(cfg)) || Ctrl || Win || _altTabActive
+        if (!cfg.Enabled || !cfg.CtrlScroll || (!AltAsCmd(cfg) && !WinAsCmd(cfg)) || Ctrl || WinAsWin(cfg) || _altTabActive
             || IsExcluded(cfg, () => system.GetProcessNameAt(point)))
             return false;
 
@@ -173,11 +182,7 @@ internal sealed class RemapEngine(IInputSystem system)
         bool swallow = HandleAlt(ref physical, ref logical, up);
         if (!_lWin && !_rWin)
         {
-            if (_winTabAltDown)
-            {
-                system.Send(new SyntheticInput[] { new SyntheticInput.Key(VK_LMENU, Up: true) });
-                _winTabAltDown = false;
-            }
+            ReleaseWinTabAlt();
             if (!_lAlt && !_rAlt) _altTabActive = false;
         }
         return swallow;
@@ -273,7 +278,10 @@ internal sealed class RemapEngine(IInputSystem system)
 
     void Capture(KeyEvent k, Action<Chord> onCaptured)
     {
-        Mods mods = (Shift ? Mods.Shift : 0) | (Ctrl ? Mods.Ctrl : 0) | (Win ? Mods.Win : 0) | (_lAlt || _rAlt ? Mods.Alt : 0);
+        Mods mods = (Shift ? Mods.Shift : 0) | (Ctrl ? Mods.Ctrl : 0) | (_lAlt || _rAlt ? Mods.Alt : 0);
+        var cfg = _config;
+        if (_captureTrigger && WinAsCmd(cfg)) mods |= Mods.Alt;
+        if (_captureTrigger ? WinAsWin(cfg) : Win) mods |= Mods.Win;
 
         // As for a shortcut, make sure releasing Alt or Win afterwards doesn't open the menu bar or Start.
         var inputs = new List<SyntheticInput>();
@@ -389,15 +397,22 @@ internal sealed class RemapEngine(IInputSystem system)
         Fix(ref _rShift, VK_RSHIFT);
         Fix(ref _lCtrl, VK_LCONTROL);
         Fix(ref _rCtrl, VK_RCONTROL);
-        Fix(ref _lWin, VK_LWIN);
-        Fix(ref _rWin, VK_RWIN);
-        // Only verifiable while Windows still thinks Alt is down.
+        // Only verifiable while Windows still thinks Alt / Win is down: once we've released the ⌘ (Win) key
+        // logically, the key state reports it up although the user is still holding it.
         if (_lAltLogical) { Fix(ref _lAlt, VK_LMENU); _lAltLogical = _lAlt; }
         if (_rAltLogical) { Fix(ref _rAlt, VK_RMENU); _rAltLogical = _rAlt; }
-        // Same for a ⌘ (Win) key we released logically.
         if (_lWinLogical) { Fix(ref _lWin, VK_LWIN); _lWinLogical = _lWin; }
         if (_rWinLogical) { Fix(ref _rWin, VK_RWIN); _rWinLogical = _rWin; }
-        if (!_lAlt && !_rAlt) _altTabActive = false;
+        if (!_lWin && !_rWin) ReleaseWinTabAlt();
+        if (!_lAlt && !_rAlt && !_winTabAltDown) _altTabActive = false;
+    }
+
+    /// <summary>Lift the synthetic Alt holding a ⌘ (Win)+Tab switcher open, if there is one.</summary>
+    void ReleaseWinTabAlt()
+    {
+        if (!_winTabAltDown) return;
+        system.Send([new SyntheticInput.Key(VK_LMENU, Up: true)]);
+        _winTabAltDown = false;
     }
 
     void ResetState()
@@ -405,7 +420,7 @@ internal sealed class RemapEngine(IInputSystem system)
         _resetRequested = false;
         _lAlt = _rAlt = _lAltLogical = _rAltLogical = false;
         _lWinLogical = _rWinLogical = false;
-        _winTabAltDown = false;
+        ReleaseWinTabAlt();
         _lShift = _rShift = _lCtrl = _rCtrl = _lWin = _rWin = false;
         _altTabActive = false;
         _swallowedKeyUps.Clear();

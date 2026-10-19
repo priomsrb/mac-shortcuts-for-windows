@@ -111,10 +111,12 @@ public class RemapEngineTests
         Assert.Equal(1, _system.MinimizeCount);
     }
 
-    [Fact]
-    public void WithCtrlHeld_NothingIsRemapped()
+    [Theory]
+    [InlineData(VK_LCONTROL)]
+    [InlineData(VK_RWIN)]
+    public void WithCtrlOrWinHeld_NothingIsRemapped(int modifier)
     {
-        Press(VK_LCONTROL);
+        Press(modifier);
         Press(VK_LMENU);
         Assert.False(Press(C));
         AssertSent([]);
@@ -201,6 +203,64 @@ public class RemapEngineTests
         Press(VK_LWIN);
         Assert.True(Press(Left)); // ⌘+Left -> Home, like Alt+Left, not the Win+Left word jump.
         AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(Home), KeyUp(Home)]);
+    }
+
+    [Fact]
+    public void WinAsCmd_TwoShortcutsInARow()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_LWIN);
+        Tap(C);
+        // Windows' key state now reports Win up: we released it logically.
+        _system.HeldKeys.Remove(VK_LWIN);
+        _system.Sent.Clear();
+
+        Assert.True(Press(X));
+        AssertSent([KeyDown(VK_LCONTROL), KeyDown(X), KeyUp(X), KeyUp(VK_LCONTROL)]);
+    }
+
+    [Fact]
+    public void WinAsCmd_ClickAndScroll_SendCtrl()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_LWIN);
+        Assert.True(_engine.OnLeftButton(down: true, default));
+        Assert.True(_engine.OnWheel(120, default));
+        Assert.True(_engine.OnLeftButton(down: false, default));
+        AssertSent([KeyDown(Mask), KeyUp(Mask), KeyUp(VK_LWIN), KeyDown(VK_LCONTROL), new SyntheticInput.LeftButton(Up: false),
+            new SyntheticInput.Wheel(120), new SyntheticInput.LeftButton(Up: true), KeyUp(VK_LCONTROL)]);
+    }
+
+    [Fact]
+    public void WinAsWin_Click_PassesThrough()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_RWIN);
+        Assert.False(_engine.OnLeftButton(down: true, default));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void WinAsCmd_TabLeftAlone_WhenDisabledOrExcluded(bool enabled, bool excluded)
+    {
+        Configure(new AppSettings { UseLeftWin = true, Enabled = enabled, ExcludedApps = excluded ? ["notepad"] : [] });
+        Press(VK_LWIN);
+        Assert.False(Press(Tab));
+        AssertSent([]);
+    }
+
+    [Fact]
+    public void WinAsCmd_Tab_ResetReleasesSyntheticAlt()
+    {
+        Configure(new AppSettings { UseLeftWin = true });
+        Press(VK_LWIN);
+        Tap(Tab);
+        _system.Sent.Clear();
+
+        _engine.ResetKeyState();
+        Press(A);
+        AssertSent([KeyUp(VK_LMENU)]);
     }
 
     [Fact]
@@ -381,10 +441,7 @@ public class RemapEngineTests
     [Fact]
     public void WinLeft_WhenOn_SendsCtrlLeftAndMasksStartMenu()
     {
-        // The Win key must be its usual self for the Win-modifier binding; Win-as-Cmd would claim it.
-        var settings = new AppSettings { UseLeftWin = false };
-        settings.Shortcuts["nav.winWord"] = true;
-        Configure(settings);
+        Enable("nav.winWord");
         Press(VK_LWIN);
         Assert.True(Press(Left));
         AssertSent([KeyDown(Mask), KeyUp(Mask), KeyDown(VK_LCONTROL), KeyUp(VK_LWIN), KeyDown(Left), KeyUp(Left),
@@ -394,9 +451,7 @@ public class RemapEngineTests
     [Fact]
     public void WinShiftLeft_WhenOn_SelectsWord()
     {
-        var settings = new AppSettings { UseLeftWin = false };
-        settings.Shortcuts["nav.winSelectWord"] = true;
-        Configure(settings);
+        Enable("nav.winSelectWord");
         Press(VK_LWIN);
         Press(VK_LSHIFT);
         Assert.True(Press(Left));

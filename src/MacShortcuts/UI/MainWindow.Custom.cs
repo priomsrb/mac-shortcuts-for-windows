@@ -62,14 +62,14 @@ internal sealed unsafe partial class MainWindow
         _recording = box;
         _recordHint = DefaultRecordHint;
         // The hook thread reports each key; the window handles it on the UI thread.
-        _setCapture(chord => PostMessage(Handle, WM_CUSTOM_KEY, (IntPtr)(int)chord.Key, (IntPtr)(int)chord.Mods));
+        _setCapture(chord => PostMessage(Handle, WM_CUSTOM_KEY, (IntPtr)(int)chord.Key, (IntPtr)(int)chord.Mods), box == _triggerBox);
         InvalidateRect(box, IntPtr.Zero, false);
     }
 
     void StopRecording()
     {
         if (_recording == IntPtr.Zero) return;
-        _setCapture(null);
+        _setCapture(null, false);
         IntPtr box = _recording;
         _recording = IntPtr.Zero;
         InvalidateRect(box, IntPtr.Zero, false);

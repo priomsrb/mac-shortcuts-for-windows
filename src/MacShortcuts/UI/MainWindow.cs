@@ -38,7 +38,7 @@ internal sealed unsafe partial class MainWindow : Window
     readonly record struct ButtonStyle(ButtonKind Kind, Backdrop Backdrop);
 
     readonly SettingsController _settings;
-    readonly Action<Action<Chord>?> _setCapture;
+    readonly Action<Action<Chord>?, bool> _setCapture;
     readonly Palette _palette;
     readonly IntPtr _surfaceBrush;
     readonly IntPtr _windowBrush;
@@ -61,9 +61,9 @@ internal sealed unsafe partial class MainWindow : Window
     public event EventHandler? RestartAsAdminRequested;
 
     /// <param name="placement">Where to show the window (e.g. to replace one with the old theme), or null to centre it.</param>
-    /// <param name="setCapture">Starts (or, with null, stops) capturing key combinations from the keyboard, for recording shortcuts.</param>
+    /// <param name="setCapture">Starts (or, with null, stops) capturing key combinations from the keyboard, for recording shortcuts; the flag is set while recording a trigger.</param>
     /// <param name="page">The page to show first.</param>
-    public MainWindow(SettingsController settings, Action<Action<Chord>?> setCapture, bool dark, WINDOWPLACEMENT? placement, Page page = Page.Shortcuts)
+    public MainWindow(SettingsController settings, Action<Action<Chord>?, bool> setCapture, bool dark, WINDOWPLACEMENT? placement, Page page = Page.Shortcuts)
     {
         _settings = settings;
         _setCapture = setCapture;

@@ -99,10 +99,7 @@ public class CustomShortcutTests
     [Fact]
     public void CtrlWinK_SendsRecordedKeys_WrappedInMaskKeys()
     {
-        // Win-as-Cmd is off here: these tests exercise the Win-as-Win custom trigger feature.
-        var settings = With(CustomShortcut.From(new Chord(Keys.K, Mods.Ctrl | Mods.Win), new Chord(Keys.Home)));
-        settings.UseLeftWin = false;
-        _engine.Update(settings.ToConfig());
+        _engine.Update(With(CustomShortcut.From(new Chord(Keys.K, Mods.Ctrl | Mods.Win), new Chord(Keys.Home))).ToConfig());
         Hold(VK_LCONTROL);
         Hold(VK_LWIN);
 
@@ -115,9 +112,7 @@ public class CustomShortcutTests
     public void AltWinLeft_SendingWinLeft_KeepsWinHeldAndSendsNoClosingMaskKey()
     {
         // A mask key tap after Win+Left would stop Windows snapping the window.
-        var settings = With(CustomShortcut.From(new Chord(Keys.Left, Mods.Alt | Mods.Win), new Chord(Keys.Left, Mods.Win)));
-        settings.UseLeftWin = false;
-        _engine.Update(settings.ToConfig());
+        _engine.Update(With(CustomShortcut.From(new Chord(Keys.Left, Mods.Alt | Mods.Win), new Chord(Keys.Left, Mods.Win))).ToConfig());
         Hold(VK_LMENU);
         Hold(VK_LWIN);
 
@@ -163,6 +158,20 @@ public class CustomShortcutTests
         Assert.Equal([new Chord(Keys.C, Mods.Alt | Mods.Shift)], captured);
         Assert.DoesNotContain(new SyntheticInput.Key(VK_LCONTROL, Up: false), _system.Sent);
         Assert.Contains(new SyntheticInput.Key(RemapEngine.MaskKey, Up: false), _system.Sent); // Releasing Alt won't open the menu bar.
+    }
+
+    [Theory]
+    [InlineData(true, Mods.Alt)]  // As it fires shortcuts.
+    [InlineData(false, Mods.Win)] // Keys to send: Win stays Win.
+    public void Capture_WinAsCmd_ReportsAltOnlyForTrigger(bool trigger, Mods expected)
+    {
+        _engine.Update(new AppSettings { UseLeftWin = true }.ToConfig());
+        var captured = new List<Chord>();
+        _engine.SetCapture(captured.Add, trigger);
+
+        Hold(VK_LWIN);
+        _engine.OnKey(new KeyEvent(K, Up: false));
+        Assert.Equal([new Chord(Keys.K, expected)], captured);
     }
 
     [Fact]
